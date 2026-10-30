@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1820">
+<title>iterm2-matrix-rain mockup</title>
+<!-- Sample mock, not a real capture.  Rain frames come from `matrix-rain preview`.
+     ?view=grid (default) shows four states; ?view=single shows one large window. -->
+<style>
+  html, body { margin: 0; width: 1820px; height: 1000px; overflow: hidden; background: #0a0d0b; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: #d6e6db; }
+  .stage { position: absolute; inset: 0; padding: 28px 30px; display: grid; gap: 22px 22px; }
+  .grid .stage { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .single .stage { padding: 26px 30px; grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .cell { display: flex; flex-direction: column; min-height: 0; }
+  .label { display: flex; align-items: baseline; gap: 12px; margin: 0 0 10px 4px; white-space: nowrap; }
+  .label b { font-size: 19px; letter-spacing: .01em; color: var(--c); }
+  .label span { font-size: 14px; color: #8fa596; }
+  .label code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: #b9cbbf; background: rgba(255,255,255,.06); padding: 1px 6px; border-radius: 5px; }
+  .win { flex: 1; min-height: 0; display: flex; flex-direction: column; border-radius: 11px; overflow: hidden;
+         border: 1px solid #2b322e; box-shadow: 0 16px 44px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.6); }
+  .bar { height: 30px; flex: none; background: #2a2c2b; display: flex; align-items: center; padding: 0 12px; position: relative;
+         font-size: 12.5px; color: #b9bdbb; }
+  .lights { display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+  .title { position: absolute; left: 0; right: 0; text-align: center; pointer-events: none; }
+  .tabs { height: 28px; flex: none; display: flex; background: #1c1e1d; border-bottom: 1px solid #000; font-size: 12px; color: #8d928f; }
+  .tabs div { flex: 1; display: flex; align-items: center; justify-content: center; border-right: 1px solid #111; }
+  .tabs .on { background: #030805; color: #d8e8dd; }
+  .body { flex: 1; position: relative; background: #030805; overflow: hidden; }
+  .body img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .6; }
+  .term { position: relative; padding: 16px 20px; font: 14.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: #a8e6b8; white-space: pre; }
+  .single .term { font-size: 19px; padding: 26px 32px; }
+  .single .bar { height: 36px; font-size: 14px; } .single .tabs { height: 32px; font-size: 13.5px; }
+  .single .lights i { width: 13px; height: 13px; }
+  .p { color: #d2f7dc; font-weight: 600; }
+  .dot { color: #4fd67a; } .t { color: #d2f7dc; font-weight: 600; } .m { color: #6f8a78; }
+  .err { color: #e07a72; } .warn { color: #e2b45a; } .ok { color: #9fe0d4; }
+  .box { display: inline-block; border: 1px solid #c9a45a; border-radius: 6px; padding: 6px 14px; color: #e7c98a; }
+  .cur { background: #7cf09e; color: #030805; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<template id="t-working"><span class="p">&gt; Add a retry with backoff to the upload step</span>
+
+<span class="dot">⏺</span> <span class="t">Read</span>(src/upload.ts)
+  <span class="m">⎿  Read 84 lines</span>
+<span class="dot">⏺</span> <span class="t">Update</span>(src/upload.ts)
+  <span class="m">⎿  Updated src/upload.ts with 12 additions</span>
+<span class="dot">⏺</span> <span class="t">Bash</span>(npm test)
+  <span class="m">⎿  Running…</span>
+
+<span class="dot">✻</span> Working… <span class="m">(esc to interrupt)</span></template>
+<template id="t-waiting"><span class="p">&gt; Push the branch</span>
+
+<span class="dot">⏺</span> <span class="t">Bash</span>(git push origin feature/retry)
+
+<span class="box">Do you want to proceed?
+<span class="warn">❯ 1. Yes</span>
+  2. No</span></template>
+<template id="t-error"><span class="p">&gt; Run the tests</span>
+
+<span class="dot">⏺</span> <span class="t">Bash</span>(npm test)
+  <span class="err">⎿  Error: 2 tests failed (exit code 1)</span>
+     <span class="m">upload.test.ts › retries on 503</span>
+     <span class="m">upload.test.ts › gives up after 3 tries</span></template>
+<template id="t-done"><span class="p">&gt; Fix the two failing tests</span>
+
+<span class="dot">⏺</span> <span class="t">Bash</span>(npm test)
+  <span class="m">⎿  42 passed</span>
+
+<span class="dot">⏺</span> All 42 tests pass.  The upload step now
+  retries 3 times with backoff.
+
+<span class="p">&gt;</span> <span class="cur"> </span></template>
+<script>
+  var STATES = [
+    { s: 'working', c: '#46d27a', what: 'prompt submitted, tool running', ev: 'UserPromptSubmit · PreToolUse' },
+    { s: 'waiting', c: '#e2b45a', what: 'Claude needs input or permission', ev: 'PermissionRequest' },
+    { s: 'error',   c: '#e07a72', what: 'a tool or turn failed, about 4 s', ev: 'PostToolUseFailure' },
+    { s: 'done',    c: '#a9e6ee', what: 'turn finished, about 4 s, then idle', ev: 'Stop' }
+  ];
+  var view = new URLSearchParams(location.search).get('view') === 'single' ? 'single' : 'grid';
+  document.body.className = view;
+  var list = view === 'single' ? [STATES[0]] : STATES;
+  var stage = document.getElementById('stage');
+  list.forEach(function (st) {
+    var cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.style.setProperty('--c', st.c);
+    cell.innerHTML =
+      '<div class="label"><b>' + st.s + '</b><span>' + st.what + '</span><code>' + st.ev + '</code></div>' +
+      '<div class="win"><div class="bar"><div class="lights"><i></i><i></i><i></i></div>' +
+      '<div class="title">~/dev/app — claude — Matrix</div></div>' +
+      '<div class="tabs"><div class="on">claude</div><div>zsh</div></div>' +
+      '<div class="body"><img src="rain-' + st.s + '.png" alt=""><div class="term"></div></div></div>';
+    cell.querySelector('.term').innerHTML = document.getElementById('t-' + st.s).innerHTML;
+    stage.appendChild(cell);
+  });
+</script>
+</body>
+</html>

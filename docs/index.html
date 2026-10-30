@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>iterm2-matrix-rain — a soft Matrix rain behind iTerm2, reacting to Claude Code</title>
+  <meta name="description" content="A Matrix theme for iTerm2 with a soft, animated digital rain behind the terminal text. The rain changes color as Claude Code works, waits, fails and finishes. Free and open source." />
+  <meta property="og:title" content="iterm2-matrix-rain" />
+  <meta property="og:description" content="A soft Matrix rain behind iTerm2 that changes color as Claude Code works, waits, fails and finishes." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://dharmaje.github.io/iterm2-matrix-rain/" />
+  <meta property="og:image" content="https://dharmaje.github.io/iterm2-matrix-rain/showcase-states.png" />
+  <meta property="og:image:width" content="1820" />
+  <meta property="og:image:height" content="1000" />
+  <meta name="theme-color" content="#030805" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%23030805'/><rect x='12' y='8' width='7' height='30' rx='3' fill='%2346d27a' opacity='.55'/><rect x='12' y='40' width='7' height='7' rx='2' fill='%23c8f5d6'/><rect x='28' y='18' width='7' height='26' rx='3' fill='%2346d27a' opacity='.55'/><rect x='28' y='46' width='7' height='7' rx='2' fill='%23c8f5d6'/><rect x='44' y='6' width='7' height='18' rx='3' fill='%2346d27a' opacity='.55'/><rect x='44' y='26' width='7' height='7' rx='2' fill='%23c8f5d6'/></svg>" />
+  <style>
+    :root {
+      --bg: #070a08;
+      --panel: #0f1411;
+      --fg: #e3eee6;
+      --muted: #93a499;
+      --accent: #46d27a;
+      --on-accent: #03140a;
+      --border: #1f2a23;
+      --c-idle: #2f8f55; --c-working: #46d27a; --c-waiting: #e2b45a; --c-error: #d0605a; --c-done: #8fd8e2; --c-off: #5b6b61;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f8f6; --panel: #ffffff; --fg: #15201a;
+        --muted: #56665c; --accent: #17803f; --on-accent: #ffffff; --border: #dde6e0;
+        --c-idle: #2d7a4b; --c-working: #17803f; --c-waiting: #b07a12; --c-error: #b3403a; --c-done: #2a8a99; --c-off: #7a8a80;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 72px 24px 96px; }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+    .logo svg { width: 40px; height: 40px; flex: none; }
+    .logo span { font-weight: 600; font-size: 18px; letter-spacing: -0.01em; }
+    h1 { font-size: clamp(32px, 6vw, 50px); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 18px; }
+    .lede { font-size: 19px; color: var(--muted); margin: 0 0 36px; max-width: 60ch; }
+    .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 14px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 9px;
+      background: var(--accent); color: var(--on-accent); text-decoration: none;
+      font-weight: 600; font-size: 16px; padding: 13px 22px; border-radius: 11px;
+      border: none; cursor: pointer; font-family: inherit; line-height: 1;
+      transition: transform .06s ease, opacity .15s ease;
+    }
+    .btn.copied { background: #1f9e6b; color: #fff; }
+    .btn:hover { opacity: .92; }
+    .btn:active { transform: translateY(1px); }
+    .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+    .reqs { color: var(--muted); font-size: 14px; margin: 0 0 56px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px 26px; margin: 18px 0;
+    }
+    .card h2 { font-size: 18px; margin: 0 0 12px; letter-spacing: -0.01em; }
+    .card ol, .card ul { margin: 0; padding-left: 20px; }
+    .card li { margin: 6px 0; color: var(--fg); }
+    .card li code, p code, td code {
+      background: rgba(127,127,127,.16); padding: 1px 6px; border-radius: 5px;
+      font: 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
+    .cmd {
+      background: rgba(127,127,127,.16); border: 1px solid var(--border);
+      border-radius: 9px; padding: 12px 14px; margin: 8px 0 4px; overflow-x: auto;
+      font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg);
+    }
+    .card .cmd code { background: none; padding: 0; border-radius: 0; font: inherit; overflow-wrap: normal; }
+    a { color: var(--accent); }
+    .note { font-size: 14px; color: var(--muted); }
+    table.states { width: 100%; border-collapse: collapse; font-size: 15px; }
+    table.states th { text-align: left; font-size: 13px; color: var(--muted); font-weight: 600; padding: 0 10px 6px 0; }
+    table.states td { padding: 8px 10px 8px 0; border-top: 1px solid var(--border); vertical-align: top; }
+    table.states td:first-child { white-space: nowrap; font-weight: 600; }
+    .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+    footer { margin-top: 64px; padding-top: 28px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+    footer a { color: var(--muted); }
+
+    /* Showcase: sample mock renders of mockup.html, wider than the text column */
+    .showcase { margin: 4px 0 52px; }
+    .showcase img {
+      display: block; position: relative; left: 50%; transform: translateX(-50%);
+      width: min(94vw, 1320px); height: auto;
+      border-radius: 14px; border: 1px solid var(--border);
+      background: #0a0d0b; box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
+    }
+    .showcase-cap { text-align: center; color: var(--muted); font-size: 13px; margin: 16px auto 0; max-width: 64ch; }
+    .card figure { margin: 4px 0 0; }
+    .card figure img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--border); }
+    .card figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+    @media (max-width: 520px) {
+      .wrap { padding: 48px 16px 72px; }
+      .card { padding: 20px 18px; }
+      .lede { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="logo">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="12" fill="#030805"/>
+        <rect x="12" y="8" width="7" height="30" rx="3" fill="#46d27a" opacity=".55"/>
+        <rect x="12" y="40" width="7" height="7" rx="2" fill="#c8f5d6"/>
+        <rect x="28" y="18" width="7" height="26" rx="3" fill="#46d27a" opacity=".55"/>
+        <rect x="28" y="46" width="7" height="7" rx="2" fill="#c8f5d6"/>
+        <rect x="44" y="6" width="7" height="18" rx="3" fill="#46d27a" opacity=".55"/>
+        <rect x="44" y="26" width="7" height="7" rx="2" fill="#c8f5d6"/>
+      </svg>
+      <span>iterm2-matrix-rain</span>
+    </div>
+
+    <h1>A soft Matrix rain behind iTerm2, reacting to Claude Code.</h1>
+    <p class="lede">
+      A Matrix color theme for iTerm2 with animated digital rain drawn behind your text.
+      The rain changes color as Claude Code works, waits for you, fails and finishes.
+    </p>
+
+    <div class="cta">
+      <button class="btn" type="button" id="copy-install"
+        data-cmd="git clone https://github.com/dharmaje/iterm2-matrix-rain.git &amp;&amp; cd iterm2-matrix-rain &amp;&amp; ./install.sh --install --autolaunch">
+        <span class="btn-label"><span aria-hidden="true">⧉</span>&nbsp; Copy install command</span>
+      </button>
+      <a class="btn secondary" href="https://github.com/dharmaje/iterm2-matrix-rain">View on GitHub</a>
+    </div>
+    <p class="reqs">Free · MIT license · macOS · iTerm2 3.5+ · Python 3.10+</p>
+
+    <section class="showcase" aria-label="iterm2-matrix-rain states">
+      <img src="showcase-states.png" width="1820" height="1000"
+        alt="Four iTerm2 windows running Claude Code over the Matrix rain. Working: bright green rain while a test runs. Waiting: amber rain behind a permission prompt. Error: crimson rain after a failed test run. Done: cyan-white rain after the tests pass." />
+      <p class="showcase-cap">Sample mock.  One rain, four moods: <strong>working</strong>, <strong>waiting</strong>, <strong>error</strong> and <strong>done</strong>.</p>
+    </section>
+
+    <div class="card">
+      <h2>What you get</h2>
+      <ul>
+        <li>A <strong>Matrix</strong> profile for iTerm2: phosphor green on near-black.</li>
+        <li>Katakana and digit rain behind the text at about 6 frames per second.</li>
+        <li>Rain that eases to a new palette when Claude Code changes state.</li>
+        <li>Auto-start with iTerm2, and a one-time notice when iTerm2 is newer than tested.</li>
+        <li>Self-update from this repo at start: fast-forward only, clean clone only.</li>
+        <li>Light on the machine: iTerm2 uses about 6% CPU idle and 22 to 24% while animating, focused window only.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Install</h2>
+      <ol>
+        <li>Turn on iTerm2's Python API: <strong>Settings &gt; General &gt; Magic &gt; Enable Python API</strong>.</li>
+        <li>Clone and install, with auto-start:
+          <pre class="cmd"><code>git clone https://github.com/dharmaje/iterm2-matrix-rain.git
+cd iterm2-matrix-rain
+./install.sh --install --autolaunch</code></pre>
+        </li>
+        <li>Add the Claude Code hooks (next card).</li>
+        <li>Pick the <strong>Matrix</strong> profile.  Set it as the default, or apply it to the current session:
+          <pre class="cmd"><code>/Applications/iTerm.app/Contents/Resources/utilities/it2 profile apply Matrix</code></pre>
+        </li>
+      </ol>
+      <p class="note" style="margin: 12px 0 0;">
+        The installer checks macOS, iTerm2 and Python first and prints a table.  It asks before
+        upgrading a package.  If a minimum is missing, it stops and writes nothing.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Claude Code hooks</h2>
+      <p class="note" style="margin: 0 0 4px;">Print the hook entries, then merge them into <code>~/.claude/settings.json</code> next to any hooks you already have.</p>
+      <pre class="cmd"><code>./install.sh --hooks</code></pre>
+      <p class="note" style="margin: 10px 0 0;">
+        Each hook sends a one-line state event to the daemon over a local socket.  It prints
+        nothing to Claude and always exits cleanly.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>States</h2>
+      <table class="states">
+        <thead><tr><th>State</th><th>Rain</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td><span class="sw" style="background: var(--c-idle)"></span>idle</td><td>Deep dim green, slow, sparse</td><td>Session start</td></tr>
+          <tr><td><span class="sw" style="background: var(--c-working)"></span>working</td><td>Brighter green, faster, denser</td><td>Prompt submitted, tool running</td></tr>
+          <tr><td><span class="sw" style="background: var(--c-waiting)"></span>waiting</td><td>Amber, slow</td><td>Claude needs input or permission</td></tr>
+          <tr><td><span class="sw" style="background: var(--c-error)"></span>error</td><td>Muted crimson for about 4 s</td><td>A tool or turn failed</td></tr>
+          <tr><td><span class="sw" style="background: var(--c-done)"></span>done</td><td>Cool cyan-white for about 4 s, then idle</td><td>Claude finished</td></tr>
+          <tr><td><span class="sw" style="background: var(--c-off)"></span>off</td><td>Fades out</td><td>Session end</td></tr>
+        </tbody>
+      </table>
+      <figure style="margin-top: 18px;">
+        <img src="showcase-working.png" width="1820" height="1000" loading="lazy"
+          alt="One large iTerm2 window in the working state: a Claude Code session reads, updates and tests a file over bright green rain." />
+        <figcaption>Sample mock of the working state.</figcaption>
+      </figure>
+    </div>
+
+    <div class="card">
+      <h2>Configure</h2>
+      <p class="note" style="margin: 0 0 4px;">
+        Put overrides in <code>~/.config/iterm2-matrix-rain/config.toml</code>.  Keys you leave out keep
+        their defaults.  The daemon reads the file at start.  The README lists every key.
+      </p>
+      <pre class="cmd"><code>[daemon]
+fps = 6.0      # frames per second, focused window
+blend = 0.6    # higher shows more rain
+
+[update]
+auto = false   # turn off self-update</code></pre>
+    </div>
+
+    <div class="card">
+      <h2>Uninstall</h2>
+      <p class="note" style="margin: 0 0 4px;">From the clone:</p>
+      <pre class="cmd"><code>./install.sh --uninstall</code></pre>
+      <p class="note" style="margin: 10px 0 0;">Then remove the hook entries from <code>~/.claude/settings.json</code>.</p>
+    </div>
+
+    <div class="card">
+      <h2>Feedback</h2>
+      <p class="note" style="margin: 0 0 12px;">Bug reports and ideas are welcome.  Include your macOS, iTerm2 and Python versions.</p>
+      <ul>
+        <li><a href="https://github.com/dharmaje/iterm2-matrix-rain/issues/new">Open an issue</a></li>
+        <li><a href="https://github.com/dharmaje/iterm2-matrix-rain/issues">Browse open issues</a></li>
+      </ul>
+    </div>
+
+    <footer>
+      <p>
+        iterm2-matrix-rain is an independent project by Jason Epel, not affiliated with, endorsed by
+        or sponsored by Anthropic or iTerm2.  "Claude" and "Claude Code" are trademarks of Anthropic, PBC.
+      </p>
+      <p>© 2026 <a href="https://jason.epel.us">Jason Epel</a> · <a href="https://github.com/dharmaje/iterm2-matrix-rain">GitHub</a> · <a href="https://github.com/dharmaje/iterm2-matrix-rain/issues">Issues</a> · <a href="https://github.com/dharmaje/iterm2-matrix-rain/blob/main/LICENSE">MIT License</a></p>
+    </footer>
+  </main>
+  <script>
+    (function () {
+      var btn = document.getElementById('copy-install');
+      if (!btn) return;
+      var label = btn.querySelector('.btn-label');
+      var original = label.innerHTML;
+      btn.addEventListener('click', function () {
+        var cmd = btn.getAttribute('data-cmd');
+        function done() {
+          label.textContent = '✓ Copied, paste into iTerm2';
+          btn.classList.add('copied');
+          setTimeout(function () { label.innerHTML = original; btn.classList.remove('copied'); }, 2200);
+        }
+        function fallback() {
+          var ta = document.createElement('textarea');
+          ta.value = cmd; ta.setAttribute('readonly', '');
+          ta.style.position = 'absolute'; ta.style.left = '-9999px';
+          document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); done(); } catch (e) {}
+          document.body.removeChild(ta);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(cmd).then(done, fallback);
+        } else { fallback(); }
+      });
+    })();
+  </script>
+</body>
+</html>
