@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iterm2-matrix-rain"
+version = "0.1.0"
+description = "A soft animated digital rain behind iTerm2 text that reacts to Claude Code hooks."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Jason Epel" }]
+requires-python = ">=3.10"
+dependencies = [
+  "iterm2>=2.7",
+  "Pillow>=10.1",
+  "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.scripts]
+matrix-rain = "matrix_rain.cli:main"
+
+[tool.setuptools]
+packages = ["matrix_rain"]
+
+[tool.setuptools.package-data]
+matrix_rain = ["defaults.toml"]
