@@ -4,6 +4,7 @@
       "Name": "Matrix",
       "Guid": "7A3E9F2C-5B1D-4E8A-9C6F-2D4B8E1A0C57",
       "Dynamic Profile Parent Name": "Default",
+      "Rewritable": true,
       "Tags": [
         "iterm2-matrix-rain"
       ],

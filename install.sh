@@ -52,6 +52,22 @@ USAGE
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
+# The Matrix profile is rewritable, so iTerm2 saves Settings edits into the
+# installed file.  Keep a copy of an edited file before replacing it.  The copy
+# goes outside DynamicProfiles: iTerm2 loads every file there, and a second
+# profile with the same Guid would clash.
+PROFILE_BACKUPS="$HOME/.cache/iterm2-matrix-rain/profile-backups"
+backup_profile() {
+  [[ -f "$PROFILE_DST" ]] || return 0
+  cmp -s "$PROFILE_DST" "$REPO/profiles/Matrix.json" && return 0
+  mkdir -p "$PROFILE_BACKUPS"
+  local stamp b n=1
+  stamp="$(date +%Y%m%d-%H%M%S)"; b="$PROFILE_BACKUPS/iterm2-matrix-rain-$stamp.json"
+  while [[ -e "$b" ]]; do b="$PROFILE_BACKUPS/iterm2-matrix-rain-$stamp-$n.json"; n=$((n + 1)); done
+  cp -p "$PROFILE_DST" "$b"
+  echo "Your edited Matrix profile was saved to $b"
+}
+
 # ver_ge FOUND NEEDED: true when FOUND >= NEEDED.  Compares dotted numbers and
 # ignores anything after them ("3.7.6beta1" is 3.7.6).
 ver_ge() {
@@ -183,6 +199,7 @@ do_install() {
   "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check -r "$REPO/requirements.txt"
   "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --no-deps -e "$REPO"
   mkdir -p "$PROFILE_DIR"
+  backup_profile
   cp "$REPO/profiles/Matrix.json" "$PROFILE_DST"
   chmod +x "$HOOK"
   local st
