@@ -42,6 +42,7 @@ Examples:
   matrix-rain camera test
   matrix-rain update
   matrix-rain version
+  matrix-rain status-component     # the camera toggle entry for the profile's status bar
 
 Run "matrix-rain <command> -h" for a command's options.
 """
@@ -389,6 +390,7 @@ def build_parser() -> argparse.ArgumentParser:
     u = sub.add_parser("update", help="fast-forward this clone from origin now")
     u.add_argument("--check-only", action="store_true", help="only report whether an update is available")
     sub.add_parser("version", help="print versions")
+    sub.add_parser("status-component", help="print the camera toggle's Status Bar Layout entry for profiles/Matrix.json")
     return ap
 
 
@@ -416,6 +418,12 @@ def main(argv: list[str] | None = None) -> int:
         return selftest_main()
     if args.cmd == "camera":
         return cmd_camera(args)
+    if args.cmd == "status-component":
+        import json
+
+        from .statusbar import layout_entry
+        print(json.dumps(layout_entry(), indent=2, ensure_ascii=False))
+        return 0
     if args.cmd == "version":
         from . import BUILT_FOR_ITERM2, __version__
         from .versions import compare, installed_iterm2

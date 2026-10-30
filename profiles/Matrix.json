@@ -247,6 +247,23 @@
             }
           },
           {
+            "class": "iTermStatusBarRPCProvidedTextComponent",
+            "configuration": {
+              "registration request v2": "ChltYXRyaXhfcmFpbl9jYW1lcmFfc3RhdHVzEgcKBWtub2JzEggKBmNhbWVyYSIgCgZjYW1lcmESFnVzZXIubWF0cml4UmFpbkNhbWVyYT8oA0KjAQoSTWF0cml4IHJhaW4gY2FtZXJhEllTaG93cyB3aGV0aGVyIGl0ZXJtMi1tYXRyaXgtcmFpbidzIGNhbWVyYSBtb3Rpb24gdGludCBpcyBvbi4gIENsaWNrIHRvIHR1cm4gaXQgb24gb3Igb2ZmLiIN4peJIGNhbWVyYSBvbjIhdXMuZXBlbC5pdGVybTItbWF0cml4LXJhaW4uY2FtZXJhQAA=",
+              "knobs": {
+                "base: priority": 5,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.4863,
+                  "Green Component": 0.9412,
+                  "Blue Component": 0.6196,
+                  "Alpha Component": 1,
+                  "Color Space": "sRGB"
+                }
+              }
+            }
+          },
+          {
             "class": "iTermStatusBarSpringComponent",
             "configuration": {
               "knobs": {

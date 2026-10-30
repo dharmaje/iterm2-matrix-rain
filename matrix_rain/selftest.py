@@ -513,6 +513,23 @@ def test_camera(cfg) -> bool:
     return ok
 
 
+def test_profile_component() -> bool:
+    """The camera toggle baked into profiles/Matrix.json matches the daemon's component."""
+    import json
+    from pathlib import Path
+
+    from .statusbar import CLASS, REQUEST_KEY, registration_b64
+
+    prof = json.loads((Path(__file__).resolve().parent.parent / "profiles" / "Matrix.json").read_text())
+    comps = prof["Profiles"][0]["Status Bar Layout"]["components"]
+    entry = next((c for c in comps if c.get("class") == CLASS), None)
+    ok = check("profile carries the camera toggle", entry is not None)
+    if entry:
+        ok &= check("profile toggle matches the daemon's registration (run matrix-rain status-component if not)",
+                    entry["configuration"].get(REQUEST_KEY) == registration_b64())
+    return ok
+
+
 def test_toggle(cfg) -> bool:
     """The status bar toggle, with no iTerm2 and the camera stubbed by the synthetic source."""
     import asyncio
@@ -570,7 +587,7 @@ def _dilation_ok() -> bool:
 
 def main() -> int:
     cfg = config.load(Path("/nonexistent"))
-    results = [test_renderer(cfg), test_state(cfg), test_hook(), test_versions(), test_update(), test_installer(), test_camera(cfg), test_toggle(cfg)]
+    results = [test_renderer(cfg), test_state(cfg), test_hook(), test_versions(), test_update(), test_installer(), test_camera(cfg), test_toggle(cfg), test_profile_component()]
     ok = all(results)
     print("all checks passed" if ok else "some checks FAILED")
     return 0 if ok else 1

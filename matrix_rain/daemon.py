@@ -226,14 +226,9 @@ class Daemon:
         import iterm2
 
         daemon = self
-        component = iterm2.StatusBarComponent(
-            short_description="Matrix rain camera",
-            detailed_description="Shows whether iterm2-matrix-rain's camera motion tint is on.  Click to turn it on or off.",
-            knobs=[],
-            exemplar="◉ camera on",
-            update_cadence=None,
-            identifier="us.epel.iterm2-matrix-rain.camera",
-        )
+        from .statusbar import build_component
+
+        component = build_component()
 
         @iterm2.StatusBarRPC
         async def matrix_rain_camera_status(knobs, camera=iterm2.Reference("user.matrixRainCamera?")):
