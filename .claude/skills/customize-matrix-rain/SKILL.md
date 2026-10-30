@@ -1,6 +1,6 @@
 ---
 name: customize-matrix-rain
-description: Customize iterm2-matrix-rain. Use when asked to change rain colors, palette, tint, speed, density, brightness, blend, fps, transition time, glyph size or font, to preview a state as a PNG, to add a new state or map another Claude Code hook event to a state, or to change the opt-in profile name in ~/.config/iterm2-matrix-rain/config.toml.
+description: Customize iterm2-matrix-rain. Use when asked to change rain colors, palette, tint, speed, density, brightness, blend, fps, transition time, glyph size or font, to preview a state as a PNG, to add a new state or map another Claude Code hook event to a state, or to change the opt-in profile name in ~/.config/iterm2-matrix-rain/config.toml, or to turn the camera motion gold tint on, off or tune it (tint, fade, sensitivity, strength).
 ---
 
 # Customize
@@ -13,4 +13,6 @@ All settings live in `matrix_rain/defaults.toml`.  Users override them in `~/.co
 4. **Glyphs.**  `[render]` sets `cell_width`, `cell_height`, `font_size`, `glow`, `mirror` and the `fonts` fallback list.  Run `matrix-rain bench` afterward; a frame should stay well under 100 ms.
 5. **Add a state.**  Add `[states.<new>]` to `defaults.toml` (transient states also need `hold` and `next`).  Add the name to `STATES` in `matrix_rain/config.py`, and add it to `TRANSIENT` in `matrix_rain/state.py` if it holds.
 6. **Map a hook event.**  Edit the `case` in `hooks/claude-code-hook.sh`, then add a row to `HOOK_CASES` in `matrix_rain/selftest.py`.  If Claude Code does not yet call the hook for that event, add it to the `--hooks` block in `install.sh`.
-7. Run `matrix-rain selftest` and update the README state table.
+7. **Camera motion tint (optional).**  Ask the user before anything that opens the camera.  Install it with `./install.sh --camera`.  Then `matrix-rain camera test` runs a 10 s live check, which triggers the macOS permission prompt the first time.  `matrix-rain camera enable` or `disable` writes only `[camera] enabled`; restart the daemon afterward.  Tune `tint`, `head_tint`, `fade`, `sensitivity`, `strength`, `fill`, `shape` (`outline` or `fill`), `burst`, `burst_rest`, `burst_strength`, `burst_tint`, `burst_head_tint`, `fps`, `warmup`, `mirror`, `only_when_active` and `device` under `[camera]`.  Preview without a camera with `matrix-rain preview /tmp/m.png --state working --motion-demo`, and check the cost with `matrix-rain bench --motion` (keep it under 20 ms).
+8. **Status bar toggle.**  The daemon registers the component `us.epel.iterm2-matrix-rain.camera` ("Matrix rain camera").  Clicking it calls `Daemon.set_camera`, which switches the camera at once and saves `[camera] enabled`.  The Matrix profile's `Status Bar Layout` in `profiles/Matrix.json` holds the stock items only, and users drag the toggle in through Configure Status Bar.  Status bar position is a global iTerm2 setting.
+9. Run `matrix-rain selftest` and update the README state table and defaults block.

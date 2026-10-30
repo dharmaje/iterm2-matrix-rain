@@ -13,6 +13,12 @@ Project page with mock screenshots and instructions: https://dharmaje.github.io/
 
 iTerm2 does not animate GIF backgrounds.  A small daemon renders soft PNG frames with Pillow and swaps each opted-in session's background image through the iTerm2 Python API.  Claude Code hooks send a one-line state event over a Unix socket, and the daemon eases the rain to the new palette over about a second.
 
+## Camera motion (optional, off by default)
+
+With the camera turned on, the rain draws a gold outline around whatever moves in front of the Mac's camera, such as you, and fades back over a second and a half.  The gold is stronger for the first few seconds after you start moving.  It is off until you run `matrix-rain camera enable`, and nothing is recorded or stored.  See [Camera motion](#camera-motion) for details.
+
+![Motion tint](docs/preview-motion.png)
+
 ## Requirements
 
 - macOS with iTerm2 3.5 or newer
@@ -126,6 +132,56 @@ Send a state by hand:
 .venv/bin/matrix-rain event --tty /dev/ttys003 waiting
 ```
 
+## Camera motion
+
+**What it does.**  The daemon reads the Mac's default camera at 320x240 in grayscale, about 10 frames a second.  It compares each frame with a slowly updated background to find what moved, then maps that onto the rain grid.  By default it takes the outline of the moving shape (`shape = "outline"`); `"fill"` uses the whole area instead.  Rain cells on that outline shift toward gold (`tint` and `head_tint`), and those with no rain falling light their glyph dimly (`fill`), so the shape reads as a figure drawn in code.  When motion starts after at least `burst_rest` seconds of stillness, the gold is brighter and stronger for `burst` seconds, then eases back over about a second.  Cells fade back to the state's colors over `fade` seconds.  The image is mirrored by default, so the gold moves like your reflection.
+
+**Privacy.**  Frames stay in memory long enough to compare one with the next.  Nothing is recorded, written to disk or sent anywhere.  With `only_when_active = true` (the default), the camera opens only while the rain animates at full rate: iTerm2 is the active app and a Matrix session is in the selected tab of the frontmost window.  Otherwise the camera is released.  The camera's indicator light is on exactly while the camera is open, and the log records each `camera: opened` and `camera: closed`.
+
+**Permission.**  macOS asks once for camera access the first time the camera opens.  When the AutoLaunch script starts the daemon, the request is in iTerm2's name.  When you run `matrix-rain daemon` or `matrix-rain camera test` by hand in a terminal, it is in the name of that terminal app or Python.  Change it later in System Settings > Privacy & Security > Camera.
+
+**A status bar toggle.**  While the daemon runs, it registers a status bar component named **Matrix rain camera** that shows `◉ camera on` or `○ camera off`.  Click it to switch the camera on or off at once.  The setting is saved to `config.toml`, so it holds after a restart.  The Matrix profile turns the status bar on with the current directory and git state.  To add the toggle, open Settings > Profiles > Matrix > Session > Configure Status Bar and drag **Matrix rain camera** into the bar.  It is listed only while the daemon runs.  If a session already used the Matrix profile before you updated it, re-apply the profile to turn the bar on: Session > Edit Session, or `it2 profile apply Matrix --session <id>`.  Whether the bar sits at the top or bottom is a global iTerm2 setting: Settings > Appearance > General > Status bar location.
+
+**Turn it on:**
+
+```bash
+./install.sh --camera                  # installs the optional pyobjc camera packages into .venv
+.venv/bin/matrix-rain camera test -v   # 10 s live check: motion coverage, frame-to-frame difference, frames per second; the first 1.5 s are marked warming up
+.venv/bin/matrix-rain camera enable    # writes [camera] enabled = true to your config.toml
+pkill -f 'matrix[-_]rain daemon'; osascript ~/Library/Application\ Support/iTerm2/Scripts/AutoLaunch/iterm2-matrix-rain.scpt
+```
+
+**Turn it off:**
+
+```bash
+.venv/bin/matrix-rain camera disable
+pkill -f 'matrix[-_]rain daemon'; osascript ~/Library/Application\ Support/iTerm2/Scripts/AutoLaunch/iterm2-matrix-rain.scpt
+```
+
+`camera enable` and `camera disable` change only the `enabled` key under `[camera]` in `~/.config/iterm2-matrix-rain/config.toml` and keep everything else in that file.  The daemon reads the setting at start, so restart it as shown.  `matrix-rain camera status` shows the current settings.
+
+| Key under `[camera]` | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Use the camera at all |
+| `tint` | `[230, 180, 60]` | Tail color where something moved |
+| `head_tint` | `[255, 232, 150]` | Head color where something moved |
+| `fade` | `1.5` | Seconds for a cell to return to normal after motion stops |
+| `sensitivity` | `0.5` | 0 reacts only to large changes, 1 to small ones too; 0.5 is a 24 gray-level threshold, which `camera test` prints |
+| `strength` | `1.0` | How far moving cells shift toward the tint, 0 to 1 |
+| `shape` | `"outline"` | `"outline"`: the gold edge of what moved; `"fill"`: the whole moving area |
+| `burst` | `3.0` | Seconds of stronger gold when motion starts after a rest |
+| `burst_rest` | `2.0` | Seconds of stillness before the next motion bursts |
+| `burst_strength` | `1.4` | Brightness multiplier for gold cells during a burst |
+| `burst_tint`, `burst_head_tint` | `[245, 200, 80]`, `[255, 245, 190]` | Tail and head colors during a burst |
+| `fill` | `0.4` | Dim glyphs lit in moving cells where no rain falls, so the shape reads; 0 turns it off |
+| `fps` | `10` | Camera frames per second; the camera is asked for this rate and extra frames are dropped |
+| `warmup` | `1.5` | Seconds after the camera opens before any tint, while the background settles |
+| `mirror` | `true` | Flip horizontally so motion reads like a mirror |
+| `only_when_active` | `true` | Open the camera only while the rain animates at full rate |
+| `device` | `""` | Part of a camera's name, for example `"Studio Display"`; empty means the default camera |
+
+To see the effect without a camera, run `matrix-rain preview out.png --state working --motion-demo`.  For a live demo in a session, run `matrix-rain daemon --session <id> --motion-demo`.  Both use a synthetic moving figure and never open the camera.
+
 ## Configuration
 
 Put overrides in `~/.config/iterm2-matrix-rain/config.toml`.  Any key you leave out keeps its default, and the daemon reads the file at start-up.  The defaults:
@@ -157,6 +213,32 @@ discover_interval = 5.0   # seconds between scans for sessions to animate
 auto = true               # false skips the update step entirely
 check_only = false        # true: only notify that an update is available
 min_interval = 3600       # seconds between checks
+
+# Camera motion (optional, off by default).  Where the camera sees movement,
+# the rain turns gold, then fades back.  Needs ./install.sh --camera.
+# Turn it on or off with `matrix-rain camera enable|disable`, then restart the
+# daemon.  Frames stay in memory at 320x240 grayscale; nothing is recorded or
+# stored.  The camera (and its indicator light) is on only while the rain
+# animates at full rate, unless only_when_active = false.
+[camera]
+enabled = false
+tint = [230, 180, 60]        # tail color where something moved
+head_tint = [255, 232, 150]  # head color where something moved
+fade = 1.5                   # seconds for a cell to fade back after motion stops
+sensitivity = 0.5            # 0 = only large changes, 1 = small changes too
+strength = 1.0               # 0..1, how far moving cells shift toward the tint
+fill = 0.4                   # 0..1, dim glyphs lit in moving cells where no rain falls; 0 = off
+fps = 10                     # camera frames per second (extra frames are dropped)
+warmup = 1.5                 # seconds after the camera opens before any tint
+shape = "outline"            # "outline": gold edge of what moved; "fill": the whole area
+burst = 3.0                  # seconds of stronger gold when motion starts after a rest
+burst_rest = 2.0             # seconds without motion before the next motion bursts
+burst_strength = 1.4         # brightness multiplier for moving cells during a burst
+burst_tint = [245, 200, 80]  # tail color during a burst
+burst_head_tint = [255, 245, 190]  # head color during a burst
+mirror = true                # move like a mirror image of you
+only_when_active = true      # open the camera only while iTerm2 is frontmost
+device = ""                  # part of a camera's name; empty = default camera
 
 [render]
 cell_width = 12           # rain glyph cell size in frame pixels
@@ -257,6 +339,7 @@ Measured on an Apple silicon Mac with iTerm2 3.7.6 and a 209x51 window:
 | Measure | Value |
 |---|---|
 | Frame render plus PNG encode (1200x586) | about 8 ms |
+| Same frame with the camera motion tint (`bench --motion`) | about 12 ms, including 0.6 ms of motion processing |
 | One background swap through the API | about 10 ms |
 | iTerm2 CPU, no animation | 4 to 8% |
 | iTerm2 CPU, animating at 6 fps | 22 to 24% |
@@ -273,6 +356,8 @@ Only sessions in the selected tab of the frontmost iTerm2 window animate at full
 - **The rain is too faint or too strong.**  Raise or lower `blend` under `[daemon]` (higher shows more rain; 0.6 is the default, 0.3 is barely visible) or `brightness` per state.
 - **The log says "update: refuse, working tree has local changes".**  Your clone has edits, so it is not updated automatically.  Commit or stash them, or keep `[update] auto = false`.
 - **A notification says iTerm2 is newer than the version this was built for.**  Usually harmless.  If the rain misbehaves, run `matrix-rain update` or check the repository for a newer release.
+- **The camera light stays off after `camera enable`.**  Restart the daemon, then check the log for `camera: opened`.  `camera: packages not installed` means you need `./install.sh --camera`, and `camera: unavailable (camera access is denied ...)` means you need to allow access in System Settings > Privacy & Security > Camera.  With `only_when_active = true`, the camera opens only while iTerm2 is frontmost.
+- **The gold appears everywhere or never.**  Lower or raise `sensitivity`.  Light flicker and auto-exposure can register as motion at high sensitivity.
 - **Stop it and clean up.**  Stop the daemon with `kill <pid>`; it restores each session's background on SIGTERM.  `./install.sh --uninstall` removes everything it installed.
 
 ## Self-test
@@ -281,7 +366,7 @@ Only sessions in the selected tab of the frontmost iTerm2 window animate at full
 .venv/bin/matrix-rain selftest
 ```
 
-Checks frame sizes and softness, state interpolation, the hook's event mapping with both `jq` and `sed`, iTerm2 version comparison, the update decision (with throwaway git repositories) and the installer's version comparison and preflight (with a stubbed `defaults`), all without iTerm2.
+Checks frame sizes and softness, state interpolation, the hook's event mapping with both `jq` and `sed`, iTerm2 version comparison, the update decision (with throwaway git repositories) and the installer's version comparison and preflight (with a stubbed `defaults`), and the camera motion mask, heat timing, tint bounds, config writes and the byte-identical camera-off frame (with a synthetic source).  None of it needs iTerm2 or a camera.
 
 ## License
 

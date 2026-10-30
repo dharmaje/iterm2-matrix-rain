@@ -6,7 +6,8 @@ A Python daemon renders PNG frames and swaps the session background through the 
 ## Commands
 
 - `./install.sh --install --autolaunch`: preflight, `.venv`, profile and AutoLaunch script.  Add `--hooks` to print the hook block.
-- `.venv/bin/matrix-rain daemon | event <state> | preview <out.png> | bench | selftest | update | version`
+- `.venv/bin/matrix-rain daemon | event <state> | preview <out.png> | bench | selftest | update | version | camera enable|disable|status|test`
+- Optional camera motion tint (gold outline, burst on new motion): `./install.sh --camera`; off unless enabled.  The daemon also registers a clickable "Matrix rain camera" status bar toggle.
 - Run `matrix-rain selftest` after every change; it needs no iTerm2.
 
 ## Safety rules
@@ -14,6 +15,7 @@ A Python daemon renders PNG frames and swaps the session background through the 
 - Never set a solid-color or bright background frame, even in a test.  Only renderer output.
 - Test only in the user's current session (`daemon --session <id>` or `event --tty <tty>`).  Restore its background afterward, then read the profile back to confirm `background_image_location` is empty.
 - Show the user the hook block before you edit `~/.claude/settings.json`, and merge it rather than replace the file.
+- Never open the camera without the user's go-ahead (`camera test`, or a daemon with `[camera] enabled = true`): it prompts and lights the camera.  Test with `--motion-demo`.
 - Never commit `.venv/`, `local/`, `*.egg-info` or anything from `~/.cache/iterm2-matrix-rain`.
 
 ## What a push does
@@ -25,6 +27,6 @@ Nothing runs on push.  Installed clones fast-forward from `origin`'s default bra
 | Need to... | Read |
 |---|---|
 | install for a user, apply the profile, add hooks, start and verify | `.claude/skills/install-matrix-rain/SKILL.md` |
-| change colors, speed, density, blend, fps, states, the profile name | `.claude/skills/customize-matrix-rain/SKILL.md` |
-| rain missing or faint, wrong window, updates refused, stopping it | `.claude/skills/troubleshoot-matrix-rain/SKILL.md` |
+| change colors, speed, density, blend, fps, states, the profile name, camera motion tint | `.claude/skills/customize-matrix-rain/SKILL.md` |
+| rain missing or faint, wrong window, updates refused, camera not reacting, stopping it | `.claude/skills/troubleshoot-matrix-rain/SKILL.md` |
 | check a measured fact before relying on it | `MEMORY.md` |
