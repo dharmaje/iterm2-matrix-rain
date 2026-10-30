@@ -166,6 +166,7 @@ pkill -f 'matrix[-_]rain daemon'; osascript ~/Library/Application\ Support/iTerm
 | `tint` | `[250, 205, 80]` | Tail color where something moved |
 | `head_tint` | `[255, 245, 200]` | Head color where something moved |
 | `fade` | `5.0` | Seconds for a cell to return to normal after motion stops |
+| `fade_curve` | `2.5` | Shapes the fade so fresh motion has more contrast; 1 is a linear fade |
 | `sensitivity` | `0.5` | 0 reacts only to large changes, 1 to small ones too; 0.5 is a 24 gray-level threshold, which `camera test` prints |
 | `strength` | `1.0` | How far moving cells shift toward the tint, 0 to 1 |
 | `shape` | `"outline"` | `"outline"`: the gold edge of what moved; `"fill"`: the whole moving area |
@@ -225,6 +226,7 @@ enabled = false
 tint = [250, 205, 80]        # tail color where something moved
 head_tint = [255, 245, 200]  # head color where something moved
 fade = 5.0                   # seconds for a cell to fade back after motion stops
+fade_curve = 2.5             # >1 dims older motion faster than fresh motion; 1 = linear fade
 sensitivity = 0.5            # 0 = only large changes, 1 = small changes too
 strength = 1.0               # 0..1, how far moving cells shift toward the tint
 fill = 0.7                   # 0..1, dim glyphs lit in moving cells where no rain falls; 0 = off
