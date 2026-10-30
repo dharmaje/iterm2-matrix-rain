@@ -6,7 +6,7 @@
 profile = "Matrix"        # animate sessions whose profile has this name
 fps = 6.0                 # frames per second for the focused window
 idle_interval = 2.0       # seconds between frames for unfocused sessions
-blend = 0.6               # iTerm2 Blend while animating; higher shows more rain, lower more background color
+blend = 0.75              # iTerm2 Blend while animating; higher shows more rain, lower more background color
 max_width = 1200          # frame width cap in pixels; iTerm2 stretches the frame
 px_per_col = 8            # frame pixels per terminal column
 px_per_row = 16           # frame pixels per terminal row
@@ -57,8 +57,8 @@ background = [2, 6, 4]
 tail = [20, 120, 55]
 head = [120, 200, 150]
 speed = 5.0
-density = 0.22
-brightness = 0.55
+density = 0.28
+brightness = 0.70
 mutation = 0.6
 
 [states.working]
@@ -66,8 +66,8 @@ background = [2, 7, 4]
 tail = [30, 165, 75]
 head = [160, 235, 185]
 speed = 10.0
-density = 0.42
-brightness = 0.75
+density = 0.48
+brightness = 0.90
 mutation = 1.4
 
 [states.waiting]
@@ -75,8 +75,8 @@ background = [7, 5, 2]
 tail = [150, 105, 25]
 head = [235, 200, 130]
 speed = 3.5
-density = 0.26
-brightness = 0.65
+density = 0.32
+brightness = 0.80
 mutation = 0.5
 
 [states.error]
@@ -84,8 +84,8 @@ background = [8, 3, 3]
 tail = [140, 35, 40]
 head = [215, 140, 140]
 speed = 6.0
-density = 0.32
-brightness = 0.65
+density = 0.36
+brightness = 0.80
 mutation = 1.0
 hold = 4.0
 next = "previous"
@@ -95,8 +95,8 @@ background = [3, 6, 8]
 tail = [60, 150, 165]
 head = [190, 230, 235]
 speed = 6.0
-density = 0.30
-brightness = 0.70
+density = 0.34
+brightness = 0.85
 mutation = 0.8
 hold = 4.0
 next = "idle"

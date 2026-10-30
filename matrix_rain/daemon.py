@@ -112,7 +112,7 @@ class Daemon:
         prof.set_background_image_location(str(path))
         if not a.initialized:
             prof.set_background_image_mode(iterm2.BackgroundImageMode.STRETCH)
-            prof.set_blend(float(self.d.get("blend", 0.6)))
+            prof.set_blend(float(self.d.get("blend", 0.75)))
         await s.async_set_profile_properties(prof)
         a.initialized = True
         return True
