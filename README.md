@@ -15,7 +15,7 @@ iTerm2 does not animate GIF backgrounds.  A small daemon renders soft PNG frames
 
 ## Camera motion (optional, off by default)
 
-With the camera turned on, the rain draws a gold outline around whatever moves in front of the Mac's camera, such as you, and fades back over about five seconds.  The gold is stronger for the first few seconds after you start moving.  It is off until you run `matrix-rain camera enable`, and nothing is recorded or stored.  See [Camera motion](#camera-motion) for details.
+With the camera turned on, the rain draws a gold outline around whatever moves in front of the Mac's camera, such as you, and fades back over about five seconds.  The gold is stronger for the first six seconds after you start moving.  It is off until you run `matrix-rain camera enable`, and nothing is recorded or stored.  See [Camera motion](#camera-motion) for details.
 
 ![Motion tint](docs/preview-motion.png)
 
@@ -172,7 +172,8 @@ pkill -f 'matrix[-_]rain daemon'; osascript ~/Library/Application\ Support/iTerm
 | `sensitivity` | `0.5` | 0 reacts only to large changes, 1 to small ones too; 0.5 is a 24 gray-level threshold, which `camera test` prints |
 | `strength` | `1.0` | How far moving cells shift toward the tint, 0 to 1 |
 | `shape` | `"outline"` | `"outline"`: the gold edge of what moved; `"fill"`: the whole moving area |
-| `burst` | `3.0` | Seconds of stronger gold when motion starts after a rest |
+| `outline_width` | `3` | Outline thickness from 1 (thin) to 8 |
+| `burst` | `6.0` | Seconds of stronger gold when motion starts after a rest |
 | `burst_rest` | `2.0` | Seconds of stillness before the next motion bursts |
 | `burst_strength` | `1.7` | Brightness multiplier for gold cells during a burst |
 | `burst_tint`, `burst_head_tint` | `[255, 220, 110]`, `[255, 252, 225]` | Tail and head colors during a burst |
@@ -238,7 +239,8 @@ fill = 0.9                   # 0..1, dim glyphs lit in moving cells where no rai
 fps = 10                     # camera frames per second (extra frames are dropped)
 warmup = 1.5                 # seconds after the camera opens before any tint
 shape = "outline"            # "outline": gold edge of what moved; "fill": the whole area
-burst = 3.0                  # seconds of stronger gold when motion starts after a rest
+outline_width = 3            # outline thickness, 1 (thin) to 8; about 2x this in camera pixels
+burst = 6.0                  # seconds of stronger gold when motion starts after a rest
 burst_rest = 2.0             # seconds without motion before the next motion bursts
 burst_strength = 1.7         # brightness multiplier for moving cells during a burst
 burst_tint = [255, 220, 110] # tail color during a burst
