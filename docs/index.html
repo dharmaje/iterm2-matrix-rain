@@ -247,6 +247,22 @@ alias matrix-camera-off='~/iterm2-matrix-rain/scripts/disable-camera.zsh --run'<
     </div>
 
     <div class="card">
+      <h2>Editing the Matrix profile</h2>
+      <p class="note" style="margin: 0 0 8px;">The Matrix profile is an iTerm2 Dynamic Profile marked <strong>rewritable</strong>: edits you make in Settings &gt; Profiles &gt; Matrix, such as adding a battery item to the status bar, are saved into its file.  Without that mark, iTerm2 shows a &ldquo;Changes Will Be Lost&rdquo; dialog and discards the edit.</p>
+      <ul>
+        <li>Your edits live in the installed file only.  Reinstalling replaces it, after saving your copy to <code>~/.cache/iterm2-matrix-rain/profile-backups/</code>.</li>
+        <li>iTerm2 may reorder the file's keys when it saves.  That is expected.</li>
+        <li>Keep the name <code>Matrix</code>, and the <strong>Matrix rain camera</strong> item if you use the toggle.</li>
+        <li>Never copy the file into the same folder under another name; two profiles with one Guid clash.</li>
+      </ul>
+      <p class="note" style="margin: 12px 0 4px;">If a change breaks it, put the repo's profile back or restore a saved copy:</p>
+      <pre class="cmd"><code>scripts/reset-matrix-profile.zsh --run
+scripts/reset-matrix-profile.zsh --run ~/.cache/iterm2-matrix-rain/profile-backups/&lt;file&gt;.json
+scripts/enable-matrix-profile.zsh --run</code></pre>
+      <p class="note" style="margin: 10px 0 0;">If a Settings dialog will not close, quit iTerm2 (&#8984;Q, or Force Quit with &#8997;&#8984;Esc).  Shells inside tmux keep running; reattach with <code>tmux attach -t &lt;name&gt;</code>.  <code>./install.sh --uninstall</code> removes everything.</p>
+    </div>
+
+    <div class="card">
       <h2>Configure</h2>
       <p class="note" style="margin: 0 0 4px;">
         Put overrides in <code>~/.config/iterm2-matrix-rain/config.toml</code>.  Keys you leave out keep

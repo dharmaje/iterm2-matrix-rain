@@ -7,6 +7,7 @@ without arguments; add `--run` to act.  They work from any folder, so you can al
 |---|---|
 | `enable-matrix-profile.zsh` | Applies the Matrix profile to the iTerm2 session you run it in, including inside tmux. |
 | `disable-matrix-profile.zsh` | Switches that session back to iTerm2's default profile, or a profile you name; the rain leaves it. |
+| `reset-matrix-profile.zsh` | Puts the repo's Matrix profile back, or a saved copy you name, after saving the current file to `~/.cache/iterm2-matrix-rain/profile-backups/`. |
 | `enable-camera.zsh` | Writes `[camera] enabled = true` to your config and restarts the daemon. |
 | `disable-camera.zsh` | Writes `[camera] enabled = false` to your config and restarts the daemon. |
 | `lib.zsh` | Shared helpers the scripts source; not run directly. |

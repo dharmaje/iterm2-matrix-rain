@@ -101,6 +101,31 @@ alias matrix-camera-off='~/iterm2-matrix-rain/scripts/disable-camera.zsh --run'
 
 See [scripts/README.md](scripts/README.md) for what each script does.
 
+## Editing the Matrix profile in iTerm2 Settings
+
+The Matrix profile is a Dynamic Profile: iTerm2 loads it from `~/Library/Application Support/iTerm2/DynamicProfiles/iterm2-matrix-rain.json`.  It ships marked **rewritable**, so changes you make in Settings > Profiles > Matrix, such as adding a battery item to the status bar, are saved into that file.  Without that mark, iTerm2 shows a "Changes Will Be Lost" dialog on every edit and throws the change away.
+
+**Cautions**
+
+- Your edits live in the installed file only, not in this repo.  `./install.sh --install` replaces the file with the repo's version; it saves your edited copy first to `~/.cache/iterm2-matrix-rain/profile-backups/`.
+- iTerm2 rewrites the whole file when it saves and may reorder its keys.  That is expected.
+- Keep the profile's name `Matrix` (the rain animates sessions by profile name) and its status bar item **Matrix rain camera** if you use the camera toggle.
+- Never copy the file into the same `DynamicProfiles` folder under another name.  Two profiles with the same Guid clash.
+
+**If a change breaks it**
+
+1. Put the repo's profile back, saving your current copy:
+   ```zsh
+   scripts/reset-matrix-profile.zsh --run
+   ```
+2. Or restore one of your saved copies; running the script without arguments lists them:
+   ```zsh
+   scripts/reset-matrix-profile.zsh --run ~/.cache/iterm2-matrix-rain/profile-backups/<file>.json
+   ```
+3. Apply it to an open window with `scripts/enable-matrix-profile.zsh --run`.
+4. If a Settings dialog will not close, quit iTerm2 with ⌘Q, or Force Quit it with ⌥⌘Esc.  Shells running inside tmux keep running; reattach with `tmux attach -t <name>`.
+5. To remove everything, run `./install.sh --uninstall`.
+
 ## Claude Code hooks
 
 `./install.sh --hooks` prints the block below with your clone's path filled in.  Merge it into `~/.claude/settings.json`; the installer never edits that file.
