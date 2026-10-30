@@ -151,6 +151,7 @@
         <li>Rain that eases to a new palette when Claude Code changes state.</li>
         <li>Auto-start with iTerm2, and a one-time notice when iTerm2 is newer than tested.</li>
         <li>Self-update from this repo at start: fast-forward only, clean clone only.</li>
+        <li>Optional camera motion: the rain outlines in gold whatever moves in view.  Off by default.</li>
         <li>Light on the machine: iTerm2 uses about 6% CPU idle and 22 to 24% while animating, focused window only.</li>
       </ul>
     </div>
@@ -202,6 +203,33 @@ cd iterm2-matrix-rain
         <img src="showcase-working.png" width="1820" height="1000" loading="lazy"
           alt="One large iTerm2 window in the working state: a Claude Code session reads, updates and tests a file over bright green rain." />
         <figcaption>Sample mock of the working state.</figcaption>
+      </figure>
+    </div>
+
+    <div class="card">
+      <h2>Camera motion (optional, off by default)</h2>
+      <p class="note" style="margin: 0 0 4px;">Install the optional packages, enable the camera, then restart the daemon:</p>
+      <pre class="cmd"><code>./install.sh --camera
+.venv/bin/matrix-rain camera enable</code></pre>
+      <p class="note" style="margin: 10px 0 4px;">To turn it off, disable it and restart the daemon:</p>
+      <pre class="cmd"><code>.venv/bin/matrix-rain camera disable</code></pre>
+      <ul style="margin-top: 14px;">
+        <li>Where something moves, the rain draws a gold outline of it, then fades back to green over about 1.5 s.</li>
+        <li>New motion bursts brighter for the first 3 s, then settles.</li>
+        <li>The camera opens only while the rain animates at full rate, so its light is off when idle.</li>
+        <li>It reads a low-resolution motion mask.  Nothing is recorded or stored.</li>
+      </ul>
+      <p class="note" style="margin: 14px 0 4px;">To fill the moving shape instead of outlining it, set this in <code>~/.config/iterm2-matrix-rain/config.toml</code>:</p>
+      <pre class="cmd"><code>[camera]
+shape = "fill"   # default "outline"</code></pre>
+      <p class="note" style="margin: 12px 0 0;">
+        The daemon adds a clickable <strong>camera on/off</strong> status bar item.  Add it once:
+        open the Matrix profile's <strong>Configure Status Bar</strong> and drag the item into the bar.
+      </p>
+      <figure style="margin-top: 18px;">
+        <img src="showcase-motion.png" width="1820" height="1000" loading="lazy"
+          alt="A large iTerm2 window in the working state.  Behind the Claude Code text, the rain draws a gold outline of a head and shoulders where a figure moved." />
+        <figcaption>Simulated mock from the built-in synthetic motion source, not a camera.</figcaption>
       </figure>
     </div>
 

@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=1820">
 <title>iterm2-matrix-rain mockup</title>
 <!-- Sample mock, not a real capture.  Rain frames come from `matrix-rain preview`.
-     ?view=grid (default) shows four states; ?view=single shows one large window. -->
+     ?view=grid (default) shows four states; ?view=single shows one large window;
+     ?view=motion shows the working state with the synthetic camera-motion outline (--motion-demo). -->
 <style>
   html, body { margin: 0; width: 1820px; height: 1000px; overflow: hidden; background: #0a0d0b; }
   * { box-sizing: border-box; }
@@ -83,20 +84,23 @@
     { s: 'error',   c: '#e07a72', what: 'a tool or turn failed, about 4 s', ev: 'PostToolUseFailure' },
     { s: 'done',    c: '#a9e6ee', what: 'turn finished, about 4 s, then idle', ev: 'Stop' }
   ];
-  var view = new URLSearchParams(location.search).get('view') === 'single' ? 'single' : 'grid';
-  document.body.className = view;
-  var list = view === 'single' ? [STATES[0]] : STATES;
+  var q = new URLSearchParams(location.search).get('view');
+  var view = q === 'single' || q === 'motion' ? q : 'grid';
+  // motion reuses the single-window layout
+  document.body.className = view === 'motion' ? 'single motion' : view;
+  var MOTION = { s: 'working', c: '#e6b43c', name: 'working + camera motion', img: 'rain-motion', what: 'movement in view draws a gold outline in the rain', ev: '[camera] enabled = true' };
+  var list = view === 'motion' ? [MOTION] : view === 'single' ? [STATES[0]] : STATES;
   var stage = document.getElementById('stage');
   list.forEach(function (st) {
     var cell = document.createElement('div');
     cell.className = 'cell';
     cell.style.setProperty('--c', st.c);
     cell.innerHTML =
-      '<div class="label"><b>' + st.s + '</b><span>' + st.what + '</span><code>' + st.ev + '</code></div>' +
+      '<div class="label"><b>' + (st.name || st.s) + '</b><span>' + st.what + '</span><code>' + st.ev + '</code></div>' +
       '<div class="win"><div class="bar"><div class="lights"><i></i><i></i><i></i></div>' +
       '<div class="title">~/dev/app — claude — Matrix</div></div>' +
       '<div class="tabs"><div class="on">claude</div><div>zsh</div></div>' +
-      '<div class="body"><img src="rain-' + st.s + '.png" alt=""><div class="term"></div></div></div>';
+      '<div class="body"><img src="' + (st.img || 'rain-' + st.s) + '.png" alt=""><div class="term"></div></div></div>';
     cell.querySelector('.term').innerHTML = document.getElementById('t-' + st.s).innerHTML;
     stage.appendChild(cell);
   });
