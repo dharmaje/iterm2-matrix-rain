@@ -167,6 +167,8 @@ pkill -f 'matrix[-_]rain daemon'; osascript ~/Library/Application\ Support/iTerm
 | `head_tint` | `[255, 245, 200]` | Head color where something moved |
 | `fade` | `5.0` | Seconds for a cell to return to normal after motion stops |
 | `fade_curve` | `2.5` | Shapes the fade so fresh motion has more contrast; 1 is a linear fade |
+| `idle_after`, `idle_fade` | `1.0`, `0.3` | After `idle_after` s with no motion, the gold clears in `idle_fade` s |
+| `gain` | `1.5` | Brightness multiplier for gold cells; a burst multiplies it further |
 | `sensitivity` | `0.5` | 0 reacts only to large changes, 1 to small ones too; 0.5 is a 24 gray-level threshold, which `camera test` prints |
 | `strength` | `1.0` | How far moving cells shift toward the tint, 0 to 1 |
 | `shape` | `"outline"` | `"outline"`: the gold edge of what moved; `"fill"`: the whole moving area |
@@ -174,7 +176,7 @@ pkill -f 'matrix[-_]rain daemon'; osascript ~/Library/Application\ Support/iTerm
 | `burst_rest` | `2.0` | Seconds of stillness before the next motion bursts |
 | `burst_strength` | `1.7` | Brightness multiplier for gold cells during a burst |
 | `burst_tint`, `burst_head_tint` | `[255, 220, 110]`, `[255, 252, 225]` | Tail and head colors during a burst |
-| `fill` | `0.7` | Dim glyphs lit in moving cells where no rain falls, so the shape reads; 0 turns it off |
+| `fill` | `0.9` | Dim glyphs lit in moving cells where no rain falls, so the shape reads; 0 turns it off |
 | `fps` | `10` | Camera frames per second; the camera is asked for this rate and extra frames are dropped |
 | `warmup` | `1.5` | Seconds after the camera opens before any tint, while the background settles |
 | `mirror` | `true` | Flip horizontally so motion reads like a mirror |
@@ -227,9 +229,12 @@ tint = [250, 205, 80]        # tail color where something moved
 head_tint = [255, 245, 200]  # head color where something moved
 fade = 5.0                   # seconds for a cell to fade back after motion stops
 fade_curve = 2.5             # >1 dims older motion faster than fresh motion; 1 = linear fade
+idle_after = 1.0             # seconds without any motion before the gold clears fast
+idle_fade = 0.3              # seconds the gold takes to clear once you are still
+gain = 1.5                   # brightness multiplier for gold cells (bursts multiply this further)
 sensitivity = 0.5            # 0 = only large changes, 1 = small changes too
 strength = 1.0               # 0..1, how far moving cells shift toward the tint
-fill = 0.7                   # 0..1, dim glyphs lit in moving cells where no rain falls; 0 = off
+fill = 0.9                   # 0..1, dim glyphs lit in moving cells where no rain falls; 0 = off
 fps = 10                     # camera frames per second (extra frames are dropped)
 warmup = 1.5                 # seconds after the camera opens before any tint
 shape = "outline"            # "outline": gold edge of what moved; "fill": the whole area
