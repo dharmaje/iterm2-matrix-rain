@@ -26,3 +26,21 @@ restart_daemon() {
     print "  $MATRIX_RAIN daemon &"
   fi
 }
+
+# Print the iTerm2 session id for the terminal this script runs in.  Inside
+# tmux, $ITERM_SESSION_ID can be stale, so match the tmux client's tty instead.
+current_session() {
+  [[ -x "$IT2" ]] || die "it2 not found at $IT2; iTerm2 3.5 or newer is required."
+  local my_tty sid
+  if [[ -n "$TMUX" ]]; then my_tty="$(tmux display -p '#{client_tty}')"; else my_tty="$(tty)"; fi
+  sid="$("$IT2" session list | tr -d '\\' | awk -F'\t' -v t="$my_tty" '$5 == t {print $1; exit}')"
+  [[ -n "$sid" ]] || die "No iTerm2 session found for $my_tty; run this from an iTerm2 window."
+  print -r -- "$sid $my_tty"
+}
+
+# Print the name of iTerm2's default profile (the one marked with a star).
+default_profile() {
+  local guid
+  guid="$(defaults read com.googlecode.iterm2 "Default Bookmark Guid" 2>/dev/null)"
+  [[ -n "$guid" ]] && "$IT2" profile list | awk -F'\t' -v g="$guid" '$1 == g {print $2; exit}'
+}

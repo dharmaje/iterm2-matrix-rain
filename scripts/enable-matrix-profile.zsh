@@ -18,15 +18,7 @@ USAGE
 }
 
 [[ "$1" == "--run" ]] || { usage; exit 0; }
-[[ -x "$IT2" ]] || die "it2 not found at $IT2; iTerm2 3.5 or newer is required."
-
-if [[ -n "$TMUX" ]]; then
-  my_tty="$(tmux display -p '#{client_tty}')"
-else
-  my_tty="$(tty)"
-fi
-sid="$("$IT2" session list | tr -d '\\' | awk -F'\t' -v t="$my_tty" '$5 == t {print $1; exit}')"
-[[ -n "$sid" ]] || die "No iTerm2 session found for $my_tty; run this from an iTerm2 window."
+read -r sid my_tty <<< "$(current_session)" || exit 1
 
 "$IT2" profile apply Matrix --session "$sid" || die "it2 could not apply the Matrix profile; is it installed (install.sh --install)?"
 print "Matrix profile applied to this session ($my_tty)."
