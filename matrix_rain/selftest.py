@@ -378,6 +378,14 @@ def test_camera(cfg) -> bool:
             break
     ok &= check("heat still visible at 1.2 s", (alive_at_1_2 or 0) > 0, f"{alive_at_1_2}")
     ok &= check("heat gone by 1.5 s (fade)", gone_at is not None and 1.4 <= gone_at <= 1.6, f"{gone_at} s")
+
+    # fade_curve: half-faded heat is much dimmer than fresh heat, so new motion stands out.
+    from .camera import shape_heat
+    half = Image.new("L", (8, 6), 128)
+    shaped = shape_heat(half, 2.5).getextrema()[1]
+    ok &= check("fade_curve 2.5 dims half-faded heat below 25%", shaped < 64, f"{shaped}/255")
+    ok &= check("fade_curve keeps fresh heat at full", shape_heat(Image.new("L", (8, 6), 255), 2.5).getextrema()[1] == 255)
+    ok &= check("fade_curve 1 is linear", shape_heat(half, 1.0).getextrema()[1] == 128)
     ok &= check("heat dilates one cell", _dilation_ok())
 
     # Tint: every channel stays between the plain and the fully gold frame.

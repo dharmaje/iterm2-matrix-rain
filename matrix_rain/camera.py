@@ -34,6 +34,7 @@ class CameraSettings:
     tint: tuple = (230, 180, 60)
     head_tint: tuple = (255, 232, 150)
     fade: float = 1.5
+    fade_curve: float = 2.5
     sensitivity: float = 0.5
     strength: float = 1.0
     fill: float = 0.4
@@ -58,6 +59,7 @@ class CameraSettings:
             tint=tuple(float(v) for v in c.get("tint", d.tint)),
             head_tint=tuple(float(v) for v in c.get("head_tint", d.head_tint)),
             fade=max(0.05, float(c.get("fade", d.fade))),
+            fade_curve=max(0.1, float(c.get("fade_curve", d.fade_curve))),
             sensitivity=min(1.0, max(0.0, float(c.get("sensitivity", d.sensitivity)))),
             strength=min(1.0, max(0.0, float(c.get("strength", d.strength)))),
             fill=min(1.0, max(0.0, float(c.get("fill", d.fill)))),
@@ -549,6 +551,15 @@ class Heat:
         return self.img.getextrema()[1]
 
 
+def shape_heat(heat: Image.Image, curve: float) -> Image.Image:
+    """Map linear heat through a power curve so fresh motion stands out:
+    with curve > 1, half-faded cells are already much dimmer than new ones."""
+    if abs(curve - 1.0) < 1e-6:
+        return heat
+    lut = [int(round(255.0 * (v / 255.0) ** curve)) for v in range(256)]
+    return heat.point(lut)
+
+
 @dataclass
 class Tint:
     """What the renderer needs to tint moving cells."""
@@ -569,6 +580,7 @@ class Tint:
         def mix(a, c):
             return tuple(x + (y - x) * b for x, y in zip(a, c))
 
+        heat = shape_heat(heat, s.fade_curve)
         return cls(heat, mix(s.tint, s.burst_tint), mix(s.head_tint, s.burst_head_tint),
                    s.strength + (1.0 - s.strength) * b, s.fill,
                    1.0 + (s.burst_strength - 1.0) * b)
