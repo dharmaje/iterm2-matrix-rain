@@ -6,6 +6,7 @@ without arguments; add `--run` to act.  They work from any folder, so you can al
 | Script | What it does |
 |---|---|
 | `enable-matrix-profile.zsh` | Applies the Matrix profile to the iTerm2 session you run it in, including inside tmux. |
+| `disable-matrix-profile.zsh` | Switches that session back to iTerm2's default profile, or a profile you name; the rain leaves it. |
 | `enable-camera.zsh` | Writes `[camera] enabled = true` to your config and restarts the daemon. |
 | `disable-camera.zsh` | Writes `[camera] enabled = false` to your config and restarts the daemon. |
 | `lib.zsh` | Shared helpers the scripts source; not run directly. |
@@ -18,6 +19,7 @@ Sample aliases for `~/.zshrc`, with your clone's path:
 
 ```zsh
 alias matrix-on='~/iterm2-matrix-rain/scripts/enable-matrix-profile.zsh --run'
+alias matrix-off='~/iterm2-matrix-rain/scripts/disable-matrix-profile.zsh --run'
 alias matrix-camera-on='~/iterm2-matrix-rain/scripts/enable-camera.zsh --run'
 alias matrix-camera-off='~/iterm2-matrix-rain/scripts/disable-camera.zsh --run'
 ```

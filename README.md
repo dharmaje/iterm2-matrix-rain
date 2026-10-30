@@ -90,7 +90,16 @@ auto = false          # skip the update step entirely
 
 ## Shortcut scripts
 
-`scripts/` has three zsh helpers you can run directly or alias: `enable-matrix-profile.zsh` switches the current iTerm2 session to the Matrix profile, and `enable-camera.zsh` and `disable-camera.zsh` turn camera motion on or off and restart the daemon.  Each prints help without arguments and acts with `--run`.  See [scripts/README.md](scripts/README.md) for aliases.
+`scripts/` has four zsh helpers you can run directly or alias: `enable-matrix-profile.zsh` and `disable-matrix-profile.zsh` switch the current iTerm2 session to the Matrix profile and back, and `enable-camera.zsh` and `disable-camera.zsh` turn camera motion on or off and restart the daemon.  Each prints help without arguments and acts with `--run`.  Suggested aliases for `~/.zshrc`, with your clone's path:
+
+```zsh
+alias matrix-on='~/iterm2-matrix-rain/scripts/enable-matrix-profile.zsh --run'
+alias matrix-off='~/iterm2-matrix-rain/scripts/disable-matrix-profile.zsh --run'
+alias matrix-camera-on='~/iterm2-matrix-rain/scripts/enable-camera.zsh --run'
+alias matrix-camera-off='~/iterm2-matrix-rain/scripts/disable-camera.zsh --run'
+```
+
+See [scripts/README.md](scripts/README.md) for what each script does.
 
 ## Claude Code hooks
 

@@ -234,6 +234,19 @@ shape = "fill"   # default "outline"</code></pre>
     </div>
 
     <div class="card">
+      <h2>Shortcut aliases (suggested)</h2>
+      <p class="note" style="margin: 0 0 4px;">The <code>scripts/</code> folder has four zsh helpers.  Add these lines to <code>~/.zshrc</code> with your clone's path, then open a new shell.</p>
+      <pre class="cmd"><code>alias matrix-on='~/iterm2-matrix-rain/scripts/enable-matrix-profile.zsh --run'
+alias matrix-off='~/iterm2-matrix-rain/scripts/disable-matrix-profile.zsh --run'
+alias matrix-camera-on='~/iterm2-matrix-rain/scripts/enable-camera.zsh --run'
+alias matrix-camera-off='~/iterm2-matrix-rain/scripts/disable-camera.zsh --run'</code></pre>
+      <ul style="margin-top: 10px;">
+        <li><code>matrix-on</code> and <code>matrix-off</code> switch the current window to the Matrix profile and back to your default profile.  They work inside tmux.</li>
+        <li><code>matrix-camera-on</code> and <code>matrix-camera-off</code> turn camera motion on or off and restart the daemon.</li>
+      </ul>
+    </div>
+
+    <div class="card">
       <h2>Configure</h2>
       <p class="note" style="margin: 0 0 4px;">
         Put overrides in <code>~/.config/iterm2-matrix-rain/config.toml</code>.  Keys you leave out keep
