@@ -35,6 +35,9 @@ class CameraSettings:
     head_tint: tuple = (255, 232, 150)
     fade: float = 1.5
     fade_curve: float = 2.5
+    idle_after: float = 1.0
+    idle_fade: float = 0.3
+    gain: float = 1.5
     sensitivity: float = 0.5
     strength: float = 1.0
     fill: float = 0.4
@@ -60,6 +63,9 @@ class CameraSettings:
             head_tint=tuple(float(v) for v in c.get("head_tint", d.head_tint)),
             fade=max(0.05, float(c.get("fade", d.fade))),
             fade_curve=max(0.1, float(c.get("fade_curve", d.fade_curve))),
+            idle_after=max(0.0, float(c.get("idle_after", d.idle_after))),
+            idle_fade=max(0.05, float(c.get("idle_fade", d.idle_fade))),
+            gain=max(0.1, float(c.get("gain", d.gain))),
             sensitivity=min(1.0, max(0.0, float(c.get("sensitivity", d.sensitivity)))),
             strength=min(1.0, max(0.0, float(c.get("strength", d.strength)))),
             fill=min(1.0, max(0.0, float(c.get("fill", d.fill)))),
@@ -498,6 +504,10 @@ class Burst:
             self.start = now
         self.last_motion = now
 
+    def idle_for(self, now: float) -> float:
+        """Seconds since motion was last seen (inf before any motion)."""
+        return float("inf") if self.last_motion is None else now - self.last_motion
+
     def factor(self, now: float) -> float:
         if self.start is None:
             return 0.0
@@ -533,8 +543,10 @@ class Heat:
         self.size = (max(1, ncols), max(1, nrows))
         self.img = Image.new("L", self.size, 0)
 
-    def update(self, mask: Image.Image | None, dt: float) -> Image.Image:
-        drop = int(round(255.0 * max(0.0, dt) / self.fade))
+    def update(self, mask: Image.Image | None, dt: float, fade: float | None = None) -> Image.Image:
+        """Decay by dt over `fade` seconds (the instance's fade unless overridden,
+        e.g. the fast idle_fade once motion has stopped), then merge new motion."""
+        drop = int(round(255.0 * max(0.0, dt) / (fade or self.fade)))
         if drop:
             lut = [max(0, v - drop) for v in range(256)]
             self.img = self.img.point(lut)
@@ -583,4 +595,4 @@ class Tint:
         heat = shape_heat(heat, s.fade_curve)
         return cls(heat, mix(s.tint, s.burst_tint), mix(s.head_tint, s.burst_head_tint),
                    s.strength + (1.0 - s.strength) * b, s.fill,
-                   1.0 + (s.burst_strength - 1.0) * b)
+                   s.gain * (1.0 + (s.burst_strength - 1.0) * b))

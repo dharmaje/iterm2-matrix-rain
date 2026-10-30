@@ -386,6 +386,20 @@ def test_camera(cfg) -> bool:
     ok &= check("fade_curve 2.5 dims half-faded heat below 25%", shaped < 64, f"{shaped}/255")
     ok &= check("fade_curve keeps fresh heat at full", shape_heat(Image.new("L", (8, 6), 255), 2.5).getextrema()[1] == 255)
     ok &= check("fade_curve 1 is linear", shape_heat(half, 1.0).getextrema()[1] == 128)
+
+    # Idle clear: with the fast idle fade, heat is gone within about 0.3 s.
+    h3 = Heat(8, 6, fade=5.0)
+    h3.update(full, 0.1)
+    steps = 0
+    while h3.peak() > 0 and steps < 50:
+        h3.update(None, 0.05, fade=0.3)
+        steps += 1
+    ok &= check("idle_fade clears a 5 s heat in about 0.3 s", 4 <= steps <= 8, f"{steps * 0.05:.2f} s")
+    st_gain = CameraSettings.from_cfg({"camera": {"gain": 1.5, "burst_strength": 1.7}})
+    g0 = Tint.from_settings(Image.new("L", (8, 6), 255), st_gain, 0.0).gain
+    g1 = Tint.from_settings(Image.new("L", (8, 6), 255), st_gain, 1.0).gain
+    ok &= check("gain 1.5 applies without a burst", abs(g0 - 1.5) < 1e-6, f"{g0}")
+    ok &= check("burst multiplies the gain", abs(g1 - 1.5 * 1.7) < 1e-6, f"{g1}")
     ok &= check("heat dilates one cell", _dilation_ok())
 
     # Tint: every channel stays between the plain and the fully gold frame.
@@ -461,8 +475,8 @@ def test_camera(cfg) -> bool:
     ok &= check("motion after 2 s rest bursts again", b.start == 13.5 and b.factor(14.0) == 1.0)
     full_b = Tint.from_settings(hot, st, 1.0)
     none_b = Tint.from_settings(hot, st, 0.0)
-    ok &= check("burst tint: stronger at start, normal after", full_b.gain == st.burst_strength and full_b.strength == 1.0
-                and full_b.head == st.burst_head_tint and none_b.gain == 1.0 and none_b.tail == st.tint)
+    ok &= check("burst tint: stronger at start, normal after", abs(full_b.gain - st.gain * st.burst_strength) < 1e-6 and full_b.strength == 1.0
+                and full_b.head == st.burst_head_tint and abs(none_b.gain - st.gain) < 1e-6 and none_b.tail == st.tint)
     rb = fresh()
     plain_gold = rb.draw(p, none_b).convert("L").tobytes()
     burst_gold = fresh().draw(p, full_b).convert("L").tobytes()

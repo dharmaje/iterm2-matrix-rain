@@ -63,8 +63,12 @@ class Animated:
             self.heat = Heat(r.ncols, r.nrows, m.settings.fade, dilate=m.settings.shape == "fill")
         elif self.heat.size != (r.ncols, r.nrows):
             self.heat.resize(r.ncols, r.nrows)
-        heat = self.heat.update(m.field.mask if m.is_open else None, dt)
-        return Tint.from_settings(heat, m.settings, m.burst.factor(time.monotonic()))
+        now = time.monotonic()
+        s = m.settings
+        # Once nothing has moved for idle_after seconds, clear the gold fast.
+        fade = s.idle_fade if m.burst.idle_for(now) >= s.idle_after else None
+        heat = self.heat.update(m.field.mask if m.is_open else None, dt, fade)
+        return Tint.from_settings(heat, s, m.burst.factor(now))
 
     def resize(self, cols, rows) -> None:
         if (cols, rows) == (self.cols, self.rows):

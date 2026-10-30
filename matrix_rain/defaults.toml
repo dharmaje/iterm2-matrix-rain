@@ -37,9 +37,12 @@ tint = [250, 205, 80]        # tail color where something moved
 head_tint = [255, 245, 200]  # head color where something moved
 fade = 5.0                   # seconds for a cell to fade back after motion stops
 fade_curve = 2.5             # >1 dims older motion faster than fresh motion; 1 = linear fade
+idle_after = 1.0             # seconds without any motion before the gold clears fast
+idle_fade = 0.3              # seconds the gold takes to clear once you are still
+gain = 1.5                   # brightness multiplier for gold cells (bursts multiply this further)
 sensitivity = 0.5            # 0 = only large changes, 1 = small changes too
 strength = 1.0               # 0..1, how far moving cells shift toward the tint
-fill = 0.7                   # 0..1, dim glyphs lit in moving cells where no rain falls; 0 = off
+fill = 0.9                   # 0..1, dim glyphs lit in moving cells where no rain falls; 0 = off
 fps = 10                     # camera frames per second (extra frames are dropped)
 warmup = 1.5                 # seconds after the camera opens before any tint
 shape = "outline"            # "outline": gold edge of what moved; "fill": the whole area
