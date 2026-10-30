@@ -25,6 +25,32 @@ auto = true               # false skips the update step entirely
 check_only = false        # true: only notify that an update is available
 min_interval = 3600       # seconds between checks
 
+# Camera motion (optional, off by default).  Where the camera sees movement,
+# the rain turns gold, then fades back.  Needs ./install.sh --camera.
+# Turn it on or off with `matrix-rain camera enable|disable`, then restart the
+# daemon.  Frames stay in memory at 320x240 grayscale; nothing is recorded or
+# stored.  The camera (and its indicator light) is on only while the rain
+# animates at full rate, unless only_when_active = false.
+[camera]
+enabled = false
+tint = [230, 180, 60]        # tail color where something moved
+head_tint = [255, 232, 150]  # head color where something moved
+fade = 1.5                   # seconds for a cell to fade back after motion stops
+sensitivity = 0.5            # 0 = only large changes, 1 = small changes too
+strength = 1.0               # 0..1, how far moving cells shift toward the tint
+fill = 0.4                   # 0..1, dim glyphs lit in moving cells where no rain falls; 0 = off
+fps = 10                     # camera frames per second (extra frames are dropped)
+warmup = 1.5                 # seconds after the camera opens before any tint
+shape = "outline"            # "outline": gold edge of what moved; "fill": the whole area
+burst = 3.0                  # seconds of stronger gold when motion starts after a rest
+burst_rest = 2.0             # seconds without motion before the next motion bursts
+burst_strength = 1.4         # brightness multiplier for moving cells during a burst
+burst_tint = [245, 200, 80]  # tail color during a burst
+burst_head_tint = [255, 245, 190]  # head color during a burst
+mirror = true                # move like a mirror image of you
+only_when_active = true      # open the camera only while iTerm2 is frontmost
+device = ""                  # part of a camera's name; empty = default camera
+
 [render]
 cell_width = 12           # rain glyph cell size in frame pixels
 cell_height = 16

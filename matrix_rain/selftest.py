@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from . import config
 from .render import Renderer, frame_size
@@ -267,9 +267,281 @@ def test_installer() -> bool:
     return ok
 
 
+def test_camera(cfg) -> bool:
+    import tempfile
+
+    from .camera import CameraSettings, Heat, MotionField, SyntheticSource, Tint
+
+    ok = True
+    st = CameraSettings.from_cfg(cfg)
+    ok &= check("camera off by default", st.enabled is False)
+
+    # Mask: a moving silhouette shows up, a still scene does not.
+    src = SyntheticSource()
+    field = MotionField(st)
+    for i in range(25):
+        field.feed(src.frame_at(3.0 + i / 10))
+    moving = field.coverage()
+    still = MotionField(st)
+    frame = src.frame_at(2.0)
+    for _ in range(15):
+        still.feed(frame)
+    ok &= check("mask: moving silhouette detected", 0.02 < moving < 0.6, f"{moving * 100:.1f}% of frame")
+    ok &= check("mask: still scene is empty", still.coverage() == 0.0, f"{still.coverage() * 100:.2f}%")
+    corner = field.mask.getpixel((2, 2))
+    ok &= check("mask: far corner stays clear", corner == 0, f"value {corner}")
+
+    # CameraSource.read() hands out each frame once (stub frames, no camera).
+    from .camera import CameraSource
+
+    cam = CameraSource()
+    ok &= check("camera read: nothing before the first frame", cam.read() is None)
+    cam._store(320, 240, 320, bytes([10]) * (320 * 240), 100.0)
+    first = cam.read()
+    again = cam.read()
+    cam._store(320, 240, 320, bytes([90]) * (320 * 240), 100.1)
+    second = cam.read()
+    ok &= check("camera read: a new frame is returned once",
+                first is not None and again is None and second is not None and cam.read() is None)
+    ok &= check("camera read: arrival time and content follow the frame",
+                cam.last_time == 100.1 and second.getpixel((5, 5)) == 90 and first.getpixel((5, 5)) == 10)
+    # A camera that ignores the requested rate (30 fps) still feeds at most 10.
+    fast = CameraSource(fps=10)
+    for k in range(30):
+        fast._store(320, 240, 320, bytes([k]) * (320 * 240), 200.0 + k / 30)
+    st30 = fast.stats()
+    ok &= check("camera at 30 fps is cut to the configured 10", 9 <= st30["delivered"] <= 11
+                and st30["dropped"] >= 19, f"{st30['delivered']} kept, {st30['dropped']} dropped")
+
+    # Warm-up gate: no mask (so no heat) for the first `warmup` seconds.
+    gate = MotionField(st)
+    syn2 = SyntheticSource()
+    masks = []
+    for i in range(25):
+        gate.feed(syn2.frame_at(i / 10), 0.1)
+        masks.append(gate.mask is not None)
+    first_on = masks.index(True) if True in masks else None
+    ok &= check(f"warm-up gate holds tint for {st.warmup:g} s", first_on is not None
+                and abs(first_on / 10 - st.warmup) <= 0.15 and gate.coverage() > 0,
+                f"first tint at {first_on / 10 if first_on is not None else None} s")
+    hw = Heat(8, 6, st.fade)
+    cold = MotionField(st)
+    cold.feed(Image.new("L", (320, 240), 0), 0.1)
+    cold.feed(Image.new("L", (320, 240), 255), 0.1)   # huge change right after opening
+    hw.update(cold.mask, 0.1)
+    ok &= check("opening flash adds no heat during warm-up", cold.coverage() > 0.9 and hw.peak() == 0,
+                f"{cold.coverage() * 100:.0f}% raw motion, heat {hw.peak()}")
+
+    syn = SyntheticSource(fps=10, clock=lambda: 50.0)
+    syn.open()
+    ok &= check("synthetic read: once per frame interval", syn.read() is not None and syn.read() is None)
+
+    # Real-camera conditions: a few gray levels of noise everywhere must stay
+    # below the threshold; a waving hand tens of levels off must cross it.
+    import random as _r
+
+    rng = _r.Random(3)
+    base = bytes(rng.randrange(90, 120) for _ in range(320 * 240))
+    def noisy(shift_box=None, delta=0):
+        img = Image.frombytes("L", (320, 240), bytes(min(255, max(0, b + rng.randrange(-3, 4))) for b in base))
+        if shift_box:
+            img.paste(Image.eval(img.crop(shift_box), lambda v: min(255, v + delta)), shift_box[:2])
+        return img
+    f = MotionField(st)
+    for _ in range(8):
+        f.feed(noisy(), 0.1)
+    noise_cover = f.coverage()
+    f.feed(noisy((120, 60, 200, 160), 30), 0.1)
+    wave_cover = f.coverage()
+    ok &= check(f"real-frame noise below threshold {f.threshold}", noise_cover == 0.0, f"{noise_cover * 100:.2f}%")
+    ok &= check("waving region (+30 levels) detected", wave_cover > 0.05, f"{wave_cover * 100:.1f}%")
+    ok &= check("frame-to-frame difference is measured", f.last_frame_diff > 1.0, f"{f.last_frame_diff:.2f} levels")
+
+    # Heat rises at once and fades to zero over `fade` seconds.
+    heat = Heat(8, 6, fade=1.5)
+    full = Image.new("L", (320, 240), 255)
+    heat.update(full, 0.1)
+    ok &= check("heat rises on first motion frame", heat.peak() == 255)
+    t, alive_at_1_2 = 0.0, None
+    while t < 2.0:
+        heat.update(None, 0.1)
+        t = round(t + 0.1, 3)
+        if t == 1.2:
+            alive_at_1_2 = heat.peak()
+    gone_at = None
+    heat2 = Heat(8, 6, fade=1.5)
+    heat2.update(full, 0.1)
+    for k in range(1, 30):
+        heat2.update(None, 0.1)
+        if heat2.peak() == 0:
+            gone_at = k / 10
+            break
+    ok &= check("heat still visible at 1.2 s", (alive_at_1_2 or 0) > 0, f"{alive_at_1_2}")
+    ok &= check("heat gone by 1.5 s (fade)", gone_at is not None and 1.4 <= gone_at <= 1.6, f"{gone_at} s")
+    ok &= check("heat dilates one cell", _dilation_ok())
+
+    # Tint: every channel stays between the plain and the fully gold frame.
+    w, h = frame_size(40, 12, cfg["daemon"])
+    sm = StateModel(cfg)
+    p = sm.palettes["working"]
+
+    def fresh():
+        r = Renderer(w, h, cfg["render"], seed=5)
+        for _ in range(12):
+            r.step(1 / 6, p)
+        return r
+
+    r = fresh()
+    plain = r.draw(p)
+    hot = Image.new("L", (r.ncols, r.nrows), 255)
+    gold = r.draw(p, Tint(hot, st.tint, st.head_tint, 1.0))
+    half = r.draw(p, Tint(hot, st.tint, st.head_tint, 0.5))
+    a, b, c = plain.tobytes(), gold.tobytes(), half.tobytes()
+    inside = all(min(x, y) - 1 <= z <= max(x, y) + 1 for x, y, z in zip(a, b, c))
+    ok &= check("tint lerp stays between plain and gold", inside)
+    ok &= check("full tint changes the frame", a != b)
+    filled = fresh().draw(p, Tint(hot, st.tint, st.head_tint, 1.0, 0.4))
+    lit_plain = sum(1 for v in plain.convert("L").tobytes() if v > 20)
+    lit_filled = sum(1 for v in filled.convert("L").tobytes() if v > 20)
+    ok &= check("fill lights moving cells where no rain falls", lit_filled > lit_plain * 1.5,
+                f"{lit_plain} -> {lit_filled} lit pixels")
+    import dataclasses
+
+    sil = SyntheticSource()
+    fm = MotionField(dataclasses.replace(st, shape="fill"))
+    hs = Heat(40, 30, st.fade)
+    for i in range(26):
+        fm.feed(sil.frame_at(1.5 + i / 10), 0.1)
+        hs.update(fm.mask, 0.1)
+    inside = sil.figure_mask(4.0).transpose(Image.Transpose.FLIP_LEFT_RIGHT).resize((40, 30), Image.Resampling.BOX)
+    pairs = list(zip(inside.tobytes(), hs.img.tobytes()))
+    core = [h for m, h in pairs if m == 255]
+    ok &= check("synthetic figure interior stays hot", core and min(core) > 200, f"min heat {min(core) if core else None}")
+    # Outline mode: one frame's mask is the edge of the moving figure.
+    of = MotionField(st)                                   # default shape = "outline"
+    ff = MotionField(dataclasses.replace(st, shape="fill"))
+    for i in range(26):
+        frame = sil.frame_at(1.5 + i / 10)
+        of.feed(frame, 0.1)
+        ff.feed(frame, 0.1)
+    grid = (80, 60)
+    ocell = of.mask.resize(grid, Image.Resampling.BOX).point(lambda v: 255 if v > 40 else 0)
+    fcell = ff.mask.resize(grid, Image.Resampling.BOX).point(lambda v: 255 if v > 40 else 0)
+    ocells, fcells = ocell.histogram()[255], fcell.histogram()[255]
+    ok &= check("outline sets far fewer cells than fill", 0 < ocells < fcells * 0.5, f"{ocells} vs {fcells} cells")
+    obox, fbox = ocell.getbbox(), fcell.getbbox()
+    ok &= check("outline surrounds the figure", obox is not None and fbox is not None
+                and all(abs(x - y) <= 2 for x, y in zip(obox, fbox)), f"{obox} vs {fbox}")
+    core = fcell.filter(ImageFilter.MinFilter(9))
+    core_n = core.histogram()[255]
+    hollow = sum(1 for c, o in zip(core.tobytes(), ocell.tobytes()) if c == 255 and o == 255)
+    ok &= check("outline leaves the figure's interior dark", core_n > 0 and hollow <= core_n * 0.1,
+                f"{hollow} of {core_n} interior cells lit")
+
+    # Burst: stronger tint for the first 3 s of motion after a rest, then eases back.
+    from .camera import Burst
+
+    b = Burst(burst=3.0, rest=2.0)
+    for t10 in range(0, 100):          # continuous motion from t = 0 to 10 s
+        b.update(0.05, t10 / 10)
+    ok &= check("burst starts on first motion", b.start == 0.0 and b.factor(1.0) == 1.0 and b.factor(2.9) == 1.0)
+    ok &= check("burst eases back after 3 s", 0.0 < b.factor(3.5) < 1.0 and b.factor(4.1) == 0.0)
+    ok &= check("continuous motion starts no second burst", b.start == 0.0 and b.factor(9.9) == 0.0)
+    b.update(0.05, 11.0)               # 1.1 s pause: shorter than burst_rest
+    ok &= check("short pause starts no burst", b.start == 0.0)
+    b.update(0.05, 13.5)               # 2.5 s pause: a new burst
+    ok &= check("motion after 2 s rest bursts again", b.start == 13.5 and b.factor(14.0) == 1.0)
+    full_b = Tint.from_settings(hot, st, 1.0)
+    none_b = Tint.from_settings(hot, st, 0.0)
+    ok &= check("burst tint: stronger at start, normal after", full_b.gain == st.burst_strength and full_b.strength == 1.0
+                and full_b.head == st.burst_head_tint and none_b.gain == 1.0 and none_b.tail == st.tint)
+    rb = fresh()
+    plain_gold = rb.draw(p, none_b).convert("L").tobytes()
+    burst_gold = fresh().draw(p, full_b).convert("L").tobytes()
+    ok &= check("burst frame is brighter", sum(burst_gold) > sum(plain_gold) * 1.1,
+                f"{sum(burst_gold) / max(1, sum(plain_gold)):.2f}x")
+
+    zero = Image.new("L", (r.ncols, r.nrows), 0)
+    ok &= check("no heat is byte-identical to camera off",
+                fresh().draw(p).tobytes() == fresh().draw(p, Tint(zero, st.tint, st.head_tint, 1.0)).tobytes()
+                and a == fresh().draw(p, None).tobytes())
+
+    # camera enable/disable writes only [camera] enabled and keeps the rest.
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "config.toml"
+        config.set_key("camera", "enabled", True, path)
+        ok &= check("camera enable creates the file", config.tomllib.loads(path.read_text()) == {"camera": {"enabled": True}})
+        path.write_text("# keep me\n[daemon]\nfps = 4  # slow\n\n[camera]\nfade = 2.0\nenabled = true\n\n[states.idle]\nspeed = 3\n")
+        config.set_key("camera", "enabled", False, path)
+        text = path.read_text()
+        data = config.tomllib.loads(text)
+        ok &= check("camera disable keeps other keys and comments",
+                    data == {"daemon": {"fps": 4}, "camera": {"fade": 2.0, "enabled": False}, "states": {"idle": {"speed": 3}}}
+                    and "# keep me" in text and "# slow" in text)
+        path.write_text("[daemon]\nfps = 4\n")
+        config.set_key("camera", "enabled", True, path)
+        ok &= check("camera enable adds a section", config.tomllib.loads(path.read_text())["camera"] == {"enabled": True})
+    return ok
+
+
+def test_toggle(cfg) -> bool:
+    """The status bar toggle, with no iTerm2 and the camera stubbed by the synthetic source."""
+    import asyncio
+    import copy
+    import tempfile
+
+    from . import daemon as dmod
+
+    ok = True
+    with tempfile.TemporaryDirectory() as tmp:
+        saved, saved_log = config.CONFIG_PATH, dmod.log
+        dmod.log = lambda msg: None
+        config.CONFIG_PATH = Path(tmp) / "config.toml"
+        config.CONFIG_PATH.write_text("# mine\n[daemon]\nfps = 5\n")
+        try:
+            async def run():
+                c = copy.deepcopy(cfg)
+                d = dmod.Daemon(None, c, [], motion_demo=True)
+                d.motion = None                      # start with the camera off
+                d.cfg["camera"]["enabled"] = False
+                checks = [("toggle shows off at start", d.status_text() == "○ camera off")]
+                on = await d.toggle_camera("selftest")
+                data = config.tomllib.loads(config.CONFIG_PATH.read_text())
+                checks.append(("toggle on: camera state and config flip",
+                               on and d.motion is not None and d.motion.source.name == "synthetic"
+                               and data["camera"]["enabled"] is True and data["daemon"]["fps"] == 5))
+                checks.append(("toggle on: status text", d.status_text() == "◉ camera demo"))
+                d.motion.open()                      # as if the loop had opened it
+                m = d.motion
+                off = await d.toggle_camera("selftest")
+                data = config.tomllib.loads(config.CONFIG_PATH.read_text())
+                checks.append(("toggle off: source closed and config saved",
+                               not off and d.motion is None and not m.is_open
+                               and data["camera"]["enabled"] is False
+                               and "# mine" in config.CONFIG_PATH.read_text()))
+                checks.append(("toggle off: status text", d.status_text() == "○ camera off"))
+                return checks
+            for name, good in asyncio.run(run()):
+                ok &= check(name, good)
+        finally:
+            config.CONFIG_PATH, dmod.log = saved, saved_log
+    return ok
+
+
+def _dilation_ok() -> bool:
+    from .camera import Heat
+
+    heat = Heat(10, 10, fade=1.5)
+    mask = Image.new("L", (320, 240), 0)
+    mask.paste(255, (160, 120, 192, 144))   # exactly one cell: column 5, row 5
+    img = heat.update(mask, 0.0)
+    return img.getpixel((5, 5)) == 255 and img.getpixel((4, 4)) == 255 and img.getpixel((6, 6)) == 255 \
+        and img.getpixel((3, 5)) == 0 and img.getpixel((7, 5)) == 0
+
+
 def main() -> int:
     cfg = config.load(Path("/nonexistent"))
-    results = [test_renderer(cfg), test_state(cfg), test_hook(), test_versions(), test_update(), test_installer()]
+    results = [test_renderer(cfg), test_state(cfg), test_hook(), test_versions(), test_update(), test_installer(), test_camera(cfg), test_toggle(cfg)]
     ok = all(results)
     print("all checks passed" if ok else "some checks FAILED")
     return 0 if ok else 1

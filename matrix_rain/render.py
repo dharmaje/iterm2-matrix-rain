@@ -193,8 +193,13 @@ class Renderer:
             elif rng.random() < spawn_p:
                 self._spawn(c)
 
-    def draw(self, p: Params) -> Image.Image:
-        """Return an RGB frame for the current simulation state."""
+    def draw(self, p: Params, tint=None) -> Image.Image:
+        """Return an RGB frame for the current simulation state.
+
+        ``tint`` (a camera.Tint) lerps each cell's tail and head colors toward
+        the motion colors by that cell's heat times strength.  With no tint, or
+        no heat anywhere, the output is exactly the untinted frame.
+        """
         w, h = self.width, self.height
         tails = Image.new("L", (w, h), 0)
         heads = Image.new("L", (w, h), 0)
@@ -204,6 +209,8 @@ class Renderer:
         gamma = self.gamma
         get = self.sprites.get
         masks = self.sprites.masks
+        if tint is not None and tint.fill > 0:
+            self._fill_moving(tails, tint, bright)
         for c in range(self.ncols):
             if not self.active[c]:
                 continue
@@ -230,12 +237,60 @@ class Renderer:
                 spr = get(col[r], level)
                 if spr is not None:
                     tails.paste(spr, (x, y), masks[col[r]])
-        bg, tc, hc = p.background, p.tail, p.head
+        base = _colorize(tails, heads, p.background, p.tail, p.head)
+        if tint is None or tint.strength <= 0 or tint.heat.getextrema()[1] == 0:
+            return base
+        gold = _colorize(tails, heads, p.background, tint.tail, tint.head, getattr(tint, "gain", 1.0))
+        mask = self._cell_mask(tint.heat, tint.strength)
+        return Image.composite(gold, base, mask)
+
+    def _fill_moving(self, tails: Image.Image, tint, bright: float) -> None:
+        """Light every moving cell's glyph dimly so the moving shape reads
+        even where no stream is falling.  Streams draw over it."""
+        heat = tint.heat
+        if heat.size != (self.ncols, self.nrows):
+            heat = heat.resize((self.ncols, self.nrows), Image.Resampling.BOX)
+        if heat.getextrema()[1] == 0:
+            return
+        cw, ch, m = self.sprites.cw, self.sprites.ch, self.sprites.margin
+        get, masks = self.sprites.get, self.sprites.masks
+        data = heat.tobytes()
+        scale = tint.fill * bright / 255.0
+        n = self.ncols
+        for i, v in enumerate(data):
+            if v < 16:
+                continue
+            c, r = i % n, i // n
+            g = self.cells[c][r]
+            spr = get(g, v * scale)
+            if spr is not None:
+                tails.paste(spr, (self.x0 + c * cw - m, r * ch - m), masks[g])
+
+    def _cell_mask(self, heat: Image.Image, strength: float) -> Image.Image:
+        """Frame-size 'L' mask: each rain cell carries its heat times strength."""
+        cw, ch = self.sprites.cw, self.sprites.ch
+        if heat.size != (self.ncols, self.nrows):
+            heat = heat.resize((self.ncols, self.nrows), Image.Resampling.BOX)
+        if strength < 1.0:
+            heat = heat.point([int(v * strength + 0.5) for v in range(256)])
+        big = heat.resize((self.ncols * cw, self.nrows * ch), Image.Resampling.BILINEAR)
+        mask = Image.new("L", (self.width, self.height), 0)
+        mask.paste(big, (self.x0, 0))
+        return mask
+
+
+def _colorize(tails: Image.Image, heads: Image.Image, bg, tc, hc, gain: float = 1.0) -> Image.Image:
+    """Map the gray canvases to color; gain brightens the glyphs (burst)."""
+    if gain == 1.0:  # the original formula, kept exact so untinted frames never change
         tail_luts = [[min(255, int(bg[i] + tc[i] * v / 255.0 + 0.5)) for v in range(256)] for i in range(3)]
         head_luts = [[min(255, int(hc[i] * v / 255.0 + 0.5)) for v in range(256)] for i in range(3)]
-        tail_rgb = Image.merge("RGB", [tails.point(lut) for lut in tail_luts])
-        head_rgb = Image.merge("RGB", [heads.point(lut) for lut in head_luts])
-        return ImageChops.add(tail_rgb, head_rgb)
+    else:
+        k = gain / 255.0
+        tail_luts = [[min(255, int(bg[i] + tc[i] * min(1.0, v * k) + 0.5)) for v in range(256)] for i in range(3)]
+        head_luts = [[min(255, int(hc[i] * min(1.0, v * k) + 0.5)) for v in range(256)] for i in range(3)]
+    tail_rgb = Image.merge("RGB", [tails.point(lut) for lut in tail_luts])
+    head_rgb = Image.merge("RGB", [heads.point(lut) for lut in head_luts])
+    return ImageChops.add(tail_rgb, head_rgb)
 
 
 def save_png(img: Image.Image, path: Path) -> None:

@@ -184,6 +184,85 @@
         "Blue Component": 0.8784,
         "Alpha Component": 1,
         "Color Space": "sRGB"
+      },
+      "Show Status Bar": true,
+      "Status Bar Layout": {
+        "advanced configuration": {
+          "algorithm": 0,
+          "remove empty components": false,
+          "font": "Menlo-Regular 12",
+          "default text color": {
+            "Red Component": 0.4863,
+            "Green Component": 0.9412,
+            "Blue Component": 0.6196,
+            "Alpha Component": 1,
+            "Color Space": "sRGB"
+          },
+          "background color": {
+            "Red Component": 0.0118,
+            "Green Component": 0.0314,
+            "Blue Component": 0.0196,
+            "Alpha Component": 1,
+            "Color Space": "sRGB"
+          },
+          "separator color": {
+            "Red Component": 0.102,
+            "Green Component": 0.2275,
+            "Blue Component": 0.149,
+            "Alpha Component": 1,
+            "Color Space": "sRGB"
+          }
+        },
+        "components": [
+          {
+            "class": "iTermStatusBarWorkingDirectoryComponent",
+            "configuration": {
+              "knobs": {
+                "base: priority": 5,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.4863,
+                  "Green Component": 0.9412,
+                  "Blue Component": 0.6196,
+                  "Alpha Component": 1,
+                  "Color Space": "sRGB"
+                }
+              }
+            }
+          },
+          {
+            "class": "iTermStatusBarGitComponent",
+            "configuration": {
+              "knobs": {
+                "base: priority": 4,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.3098,
+                  "Green Component": 0.6588,
+                  "Blue Component": 0.4157,
+                  "Alpha Component": 1,
+                  "Color Space": "sRGB"
+                }
+              }
+            }
+          },
+          {
+            "class": "iTermStatusBarSpringComponent",
+            "configuration": {
+              "knobs": {
+                "base: priority": 1,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.4863,
+                  "Green Component": 0.9412,
+                  "Blue Component": 0.6196,
+                  "Alpha Component": 1,
+                  "Color Space": "sRGB"
+                }
+              }
+            }
+          }
+        ]
       }
     }
   ]

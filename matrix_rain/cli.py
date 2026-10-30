@@ -23,6 +23,7 @@ Commands:
   preview    Render one frame to a PNG without iTerm2.
   bench      Measure render and PNG encode time per frame.
   selftest   Run the built-in checks (no iTerm2 needed).
+  camera     Optional camera motion tint: enable, disable, status, test.
   update     Fast-forward this clone from origin now (clean clone only), then exit.
   version    Print this project's version, the iTerm2 version it was built for,
              and the installed iTerm2 version.
@@ -35,6 +36,10 @@ Examples:
   matrix-rain preview docs/preview-working.png --state working
   matrix-rain bench --cols 209 --rows 51
   matrix-rain selftest
+  matrix-rain preview docs/preview-motion.png --state working --motion-demo
+  matrix-rain bench --motion
+  matrix-rain camera enable
+  matrix-rain camera test
   matrix-rain update
   matrix-rain version
 
@@ -152,9 +157,30 @@ def _sim(cols, rows, state, seconds, fps, seed=7):
     return r, p, cfg
 
 
+def _motion_demo(r, cfg, seconds: float = 1.0, fps: float = 10.0, t_end: float = 10.0):
+    """Run the synthetic silhouette through the motion pipeline; return a Tint."""
+    from .camera import Burst, CameraSettings, Heat, MotionField, SyntheticSource, Tint
+
+    s = CameraSettings.from_cfg(cfg)
+    src = SyntheticSource()
+    motion = MotionField(s)
+    heat = Heat(r.ncols, r.nrows, s.fade, dilate=s.shape == "fill")
+    burst = Burst(s.burst, s.burst_rest)
+    seconds += s.warmup   # frames inside the warm-up gate add no heat
+    steps = int(seconds * fps)
+    for i in range(steps + 1):
+        t = t_end - seconds + i / fps
+        motion.feed(src.frame_at(t), 1.0 / fps)
+        if motion.mask is not None:
+            burst.update(motion.coverage(), t)
+        heat.update(motion.mask, 1.0 / fps)
+    return Tint.from_settings(heat.img, s, burst.factor(t))
+
+
 def cmd_preview(args) -> int:
-    r, p, _ = _sim(args.cols, args.rows, args.state, args.warmup, 6.0)
-    img = r.draw(p)
+    r, p, cfg = _sim(args.cols, args.rows, args.state, args.warmup, 6.0)
+    tint = _motion_demo(r, cfg) if args.motion_demo else None
+    img = r.draw(p, tint)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     img.save(out, format="PNG", optimize=True)
@@ -173,14 +199,25 @@ def cmd_bench(args) -> int:
     t0 = time.perf_counter()
     sprites = SpriteCache(cfg["render"])
     t_sprites = (time.perf_counter() - t0) * 1000
-    r, p, _ = _sim(args.cols, args.rows, args.state, 8, 6.0)
+    r, p, cfg = _sim(args.cols, args.rows, args.state, 8, 6.0)
     w, h = r.width, r.height
     step_ms, draw_ms, enc_ms = [], [], []
-    for _ in range(args.frames):
+    motion = heat = src = tint_cfg = None
+    if args.motion:
+        from .camera import CameraSettings, Heat, MotionField, SyntheticSource, Tint
+
+        cs = CameraSettings.from_cfg(cfg)
+        src, motion, heat = SyntheticSource(), MotionField(cs), Heat(r.ncols, r.nrows, cs.fade, dilate=cs.shape == "fill")
+        tint_cfg = cs
+    for i in range(args.frames):
         t0 = time.perf_counter()
         r.step(1 / 6, p)
+        tint = None
+        if motion is not None:
+            motion.feed(src.frame_at(i / 6), 1 / 6)
+            tint = Tint.from_settings(heat.update(motion.mask, 1 / 6), tint_cfg, 1.0)
         t1 = time.perf_counter()
-        img = r.draw(p)
+        img = r.draw(p, tint)
         t2 = time.perf_counter()
         buf = io.BytesIO()
         img.save(buf, format="PNG", compress_level=1)
@@ -194,11 +231,111 @@ def cmd_bench(args) -> int:
         return sorted(xs)[int(len(xs) * 0.95) - 1]
 
     print(f"grid {args.cols}x{args.rows} -> frame {w}x{h}, state {args.state}, "
+          f"motion tint {'on (synthetic source; step includes camera processing)' if args.motion else 'off'}, "
           f"{len(sprites.glyphs)} glyphs, font {sprites.font_path}")
     print(f"sprite cache build: {t_sprites:.0f} ms (once at start-up)")
     for name, xs in (("step", step_ms), ("draw", draw_ms), ("encode", enc_ms), ("total", total)):
         print(f"{name:7s} mean {statistics.mean(xs):6.1f} ms   p95 {p95(xs):6.1f} ms")
     print(f"PNG size about {len(buf.getvalue()) // 1024} KB")
+    return 0
+
+
+# ---------------------------------------------------------------- camera
+
+RESTART_HINT = """Restart the daemon so it takes effect:
+  pkill -f 'matrix[-_]rain daemon'
+  osascript ~/Library/Application\\ Support/iTerm2/Scripts/AutoLaunch/iterm2-matrix-rain.scpt
+(or run .venv/bin/matrix-rain daemon from an iTerm2 terminal)."""
+
+
+def cmd_camera(args) -> int:
+    from . import config
+    from .camera import CameraSettings
+
+    if args.action in ("enable", "disable"):
+        path = config.set_key("camera", "enabled", args.action == "enable")
+        print(f"camera {args.action}d in {path}")
+        if args.action == "enable":
+            try:
+                import AVFoundation  # noqa: F401
+            except Exception:
+                print("The camera packages are not installed yet; run ./install.sh --camera")
+        print(RESTART_HINT)
+        return 0
+    s = CameraSettings.from_cfg(config.load())
+    if args.action == "status":
+        try:
+            import AVFoundation  # noqa: F401
+            pkgs = "installed"
+        except Exception:
+            pkgs = "not installed (./install.sh --camera)"
+        print(f"camera enabled: {'yes' if s.enabled else 'no'}  (config: {config.CONFIG_PATH})")
+        print(f"camera packages: {pkgs}")
+        print(f"tint {list(s.tint)}, head_tint {list(s.head_tint)}, fade {s.fade} s, sensitivity {s.sensitivity}, "
+              f"strength {s.strength}, fill {s.fill}, fps {s.fps:g}, mirror {s.mirror}, only_when_active {s.only_when_active}, "
+              f"device {s.device or '(default)'}")
+        return 0
+    # test
+    from .camera import CameraSource, CameraUnavailable, MotionField, SyntheticSource
+
+    src = SyntheticSource(fps=s.fps) if args.synthetic else CameraSource(s.device, s.fps)
+    motion = MotionField(s)
+    try:
+        src.open()
+    except CameraUnavailable as exc:
+        print(f"camera not available: {exc}")
+        return 1
+    print(f"{src.name} open for {args.seconds:g} s; move in front of it.  Nothing is recorded.")
+    print(f"sensitivity {s.sensitivity} -> threshold {motion.threshold} gray levels against the background; "
+          f"warm-up {s.warmup:g} s")
+    if getattr(src, "rate_note", ""):
+        print(src.rate_note)
+    try:
+        start = time.monotonic()
+        second, frames, cover, diffs, last_t, first = 1, 0, [], [], 0.0, True
+        warming = False
+        delivered0 = src.stats()["delivered"] if hasattr(src, "stats") else 0
+
+        def report():
+            nonlocal delivered0
+            avg = sum(cover) / len(cover) if cover else 0.0
+            peak = max(cover) if cover else 0.0
+            line = f"  {second:2d}s  frames {frames:3d}  motion {avg * 100:5.1f}% avg  {peak * 100:5.1f}% peak"
+            if warming:
+                line += "  (warming up, no tint)"
+            if args.verbose:
+                mad = sum(diffs) / len(diffs) if diffs else 0.0
+                line += f"  frame-to-frame diff {mad:5.2f} levels"
+                if hasattr(src, "stats"):
+                    st = src.stats()
+                    line += f"  delivered {st['delivered'] - delivered0:3d}  dropped {st['dropped']}  errors {st['errors']}"
+                    if st["last_error"]:
+                        line += f" ({st['last_error'][:60]})"
+                    delivered0 = st["delivered"]
+            print(line)
+
+        while time.monotonic() - start < args.seconds:
+            img = src.read()   # None unless a new frame arrived
+            if img is not None:
+                t = src.last_time
+                dt = t - last_t if last_t else 1.0 / s.fps
+                last_t = t
+                motion.feed(img, dt)
+                warming = warming or motion.warming
+                frames += 1
+                cover.append(motion.coverage())
+                if not first:
+                    diffs.append(motion.last_frame_diff)
+                first = False
+            if time.monotonic() - start >= second:
+                report()
+                second, frames, cover, diffs, warming = second + 1, 0, [], [], False
+            time.sleep(0.01)
+        if frames:
+            report()
+    finally:
+        src.close()
+        print(f"{src.name} closed")
     return 0
 
 
@@ -215,6 +352,8 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--session", action="append", default=[],
                    help="animate this session id only (repeatable); skips the profile-name opt-in")
     d.add_argument("--fps", type=float, help="override [daemon] fps")
+    d.add_argument("--motion-demo", action="store_true",
+                   help="feed a synthetic moving silhouette instead of the camera (never opens the camera)")
     d.add_argument("--update-now", action="store_true",
                    help="run the self-update step even if it ran within the last hour")
     d.add_argument("--verbose", "-v", action="store_true")
@@ -231,14 +370,22 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cols", type=int, default=160)
     p.add_argument("--rows", type=int, default=45)
     p.add_argument("--warmup", type=float, default=8.0, help="seconds simulated before the frame")
+    p.add_argument("--motion-demo", action="store_true", help="tint a synthetic moving silhouette gold")
 
     b = sub.add_parser("bench", help="measure frame time")
     b.add_argument("--cols", type=int, default=209)
     b.add_argument("--rows", type=int, default=51)
     b.add_argument("--state", choices=STATES, default="working")
     b.add_argument("--frames", type=int, default=120)
+    b.add_argument("--motion", action="store_true", help="include the camera motion tint (synthetic source)")
 
     sub.add_parser("selftest", help="run built-in checks")
+    c = sub.add_parser("camera", help="enable, disable, check or test the optional camera motion tint")
+    c.add_argument("action", choices=["enable", "disable", "status", "test"])
+    c.add_argument("--seconds", type=float, default=10.0, help="test duration")
+    c.add_argument("--synthetic", action="store_true", help="test with the synthetic source, not the camera")
+    c.add_argument("--verbose", "-v", action="store_true",
+                   help="also print the mean frame-to-frame difference and frames delivered per second")
     u = sub.add_parser("update", help="fast-forward this clone from origin now")
     u.add_argument("--check-only", action="store_true", help="only report whether an update is available")
     sub.add_parser("version", help="print versions")
@@ -267,6 +414,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "selftest":
         from .selftest import main as selftest_main
         return selftest_main()
+    if args.cmd == "camera":
+        return cmd_camera(args)
     if args.cmd == "version":
         from . import BUILT_FOR_ITERM2, __version__
         from .versions import compare, installed_iterm2

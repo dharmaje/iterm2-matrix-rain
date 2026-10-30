@@ -29,6 +29,8 @@ Usage: ./install.sh <option> [<option> ...]
   --uninstall      Stop the daemon and remove the AutoLaunch script (and any LaunchAgent
                    from older versions), the Dynamic Profile, the cache folder and .venv.
                    Your Claude Code hooks are left for you to remove.
+  --camera         Install the optional camera packages (requirements-camera.txt) into
+                   .venv for the camera motion tint, then print how to enable it.
   --yes            Answer yes to upgrade prompts (for non-interactive runs).
 
 Before changing anything, --install and --autolaunch check macOS, iTerm2 $MIN_ITERM2+,
@@ -42,6 +44,7 @@ Examples:
   ./install.sh --install
   ./install.sh --install --autolaunch
   ./install.sh --install --yes
+  ./install.sh --camera
   ./install.sh --hooks
   ./install.sh --uninstall
 USAGE
@@ -67,11 +70,11 @@ ver_ge() {
 ROWS=()
 row() { ROWS+=("$1|$2|$3|$4"); }
 print_rows() {
-  printf '%-22s %-12s %-14s %s\n' "Dependency" "Required" "Found" "Status"
+  printf '%-30s %-12s %-14s %s\n' "Dependency" "Required" "Found" "Status"
   local r IFS='|'
   for r in "${ROWS[@]}"; do
     set -- $r
-    printf '%-22s %-12s %-14s %s\n' "$1" "$2" "$3" "$4"
+    printf '%-30s %-12s %-14s %s\n' "$1" "$2" "$3" "$4"
   done
 }
 
@@ -126,6 +129,12 @@ preflight() {
     row "jq (optional)" "any" "not found" "OK (hook uses sed)"
   fi
 
+  if [ -x "$VENV/bin/python" ] && "$VENV/bin/python" -c 'import AVFoundation' 2>/dev/null; then
+    row "camera pkgs (optional)" "pyobjc" "installed" "OK"
+  else
+    row "camera pkgs (optional)" "pyobjc" "not installed" "OK (--camera adds)"
+  fi
+
   print_rows
   [ -z "$problem" ] || die "$problem"
 }
@@ -142,10 +151,10 @@ confirm() {  # confirm "question": returns 0 on yes
 
 # package_plan: what pip would change in the venv, one line each:
 #   install <name> <to>   or   upgrade <name> <from> <to>
-package_plan() {
-  local report
+package_plan() {  # package_plan [requirements file]
+  local report req="${1:-$REPO/requirements.txt}"
   report="$("$VENV/bin/python" -m pip install --dry-run --quiet --disable-pip-version-check \
-    --report - -r "$REPO/requirements.txt" 2>/dev/null)" || return 1
+    --report - -r "$req" 2>/dev/null)" || return 1
   REPORT="$report" "$VENV/bin/python" - <<'PY'
 import json, os
 from importlib import metadata
@@ -170,7 +179,32 @@ do_install() {
     rm -rf "${VENV:?}"
     "$py" -m venv "$VENV"
   fi
-  plan="$(package_plan)" || die "could not resolve requirements.txt with pip (network down?)"
+  confirm_packages "$REPO/requirements.txt"
+  "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check -r "$REPO/requirements.txt"
+  "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --no-deps -e "$REPO"
+  mkdir -p "$PROFILE_DIR"
+  cp "$REPO/profiles/Matrix.json" "$PROFILE_DST"
+  chmod +x "$HOOK"
+  local st
+  st="$("$VENV/bin/matrix-rain" selftest 2>&1)" || { echo "$st" | grep -v '^PASS' >&2; die "installed, but the self-test failed (see above)"; }
+  echo "Installed.  Self-test: $(echo "$st" | tail -1)"
+  cat <<NEXT
+
+Next steps:
+  1. Use the Matrix profile: Settings > Profiles > Matrix > Other Actions > Set as Default,
+     or open a window with it (Profiles menu).
+  2. Start the daemon with iTerm2:  ./install.sh --autolaunch
+     (or by hand from an iTerm2 terminal:  $VENV/bin/matrix-rain daemon).
+  3. Add the Claude Code hooks:  ./install.sh --hooks
+  4. Optional: camera motion tint:  ./install.sh --camera
+NEXT
+}
+
+# confirm_packages FILE: show what pip would install or upgrade from FILE and
+# ask before any upgrade.  Declining exits with nothing changed.
+confirm_packages() {
+  local plan upgrades
+  plan="$(package_plan "$1")" || die "could not resolve $(basename "$1") with pip (network down?)"
   ROWS=()
   local kind name a b
   while read -r kind name a b; do
@@ -189,23 +223,20 @@ do_install() {
     done <<<"$plan"
     confirm "Upgrade?" || die "upgrade declined; nothing was changed.  Rerun and answer y, or pass --yes."
   fi
-  "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check -r "$REPO/requirements.txt"
-  "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --no-deps -e "$REPO"
-  mkdir -p "$PROFILE_DIR"
-  cp "$REPO/profiles/Matrix.json" "$PROFILE_DST"
-  chmod +x "$HOOK"
-  local st
-  st="$("$VENV/bin/matrix-rain" selftest 2>&1)" || { echo "$st" | grep -v '^PASS' >&2; die "installed, but the self-test failed (see above)"; }
-  echo "Installed.  Self-test: $(echo "$st" | tail -1)"
-  cat <<NEXT
+}
 
-Next steps:
-  1. Use the Matrix profile: Settings > Profiles > Matrix > Other Actions > Set as Default,
-     or open a window with it (Profiles menu).
-  2. Start the daemon with iTerm2:  ./install.sh --autolaunch
-     (or by hand from an iTerm2 terminal:  $VENV/bin/matrix-rain daemon).
-  3. Add the Claude Code hooks:  ./install.sh --hooks
-NEXT
+do_camera() {
+  [ -x "$VENV/bin/python" ] || die "run ./install.sh --install first"
+  confirm_packages "$REPO/requirements-camera.txt"
+  "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check -r "$REPO/requirements-camera.txt"
+  "$VENV/bin/python" -c 'import AVFoundation, Quartz, CoreMedia, libdispatch' \
+    || die "camera packages installed but do not import"
+  cat <<CAM
+Camera packages installed.  The camera stays off until you enable it:
+  $VENV/bin/matrix-rain camera enable     (then restart the daemon)
+  $VENV/bin/matrix-rain camera test       (10 s live check; macOS asks for camera access)
+  $VENV/bin/matrix-rain camera disable
+CAM
 }
 
 do_hooks() {
@@ -275,7 +306,7 @@ fi
 need_preflight=0
 for arg in "$@"; do
   case "$arg" in
-    --install|--autolaunch) need_preflight=1 ;;
+    --install|--autolaunch|--camera) need_preflight=1 ;;
     --hooks|--uninstall) ;;
     --yes|-y) ASSUME_YES=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -286,6 +317,11 @@ done
 for arg in "$@"; do
   case "$arg" in
     --install) do_install ;;
+  esac
+done
+for arg in "$@"; do
+  case "$arg" in
+    --camera) do_camera ;;
   esac
 done
 for arg in "$@"; do

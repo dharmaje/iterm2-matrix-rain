@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iterm2-matrix-rain"
-version = "0.1.0"
+version = "0.2.0"
 description = "A soft animated digital rain behind iTerm2 text that reacts to Claude Code hooks."
 readme = "README.md"
 license = { text = "MIT" }

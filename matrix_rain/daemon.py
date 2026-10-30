@@ -49,6 +49,22 @@ class Animated:
         self.initialized = False
         self.orig_blend: float | None = None
         self.frames = 0
+        self.motion = None   # Daemon's Motion controller, or None when off
+        self.heat = None
+
+    def _tint(self, dt: float):
+        m = self.motion
+        if m is None:
+            return None
+        from .camera import Heat, Tint
+
+        r = self.renderer
+        if self.heat is None:
+            self.heat = Heat(r.ncols, r.nrows, m.settings.fade, dilate=m.settings.shape == "fill")
+        elif self.heat.size != (r.ncols, r.nrows):
+            self.heat.resize(r.ncols, r.nrows)
+        heat = self.heat.update(m.field.mask if m.is_open else None, dt)
+        return Tint.from_settings(heat, m.settings, m.burst.factor(time.monotonic()))
 
     def resize(self, cols, rows) -> None:
         if (cols, rows) == (self.cols, self.rows):
@@ -65,15 +81,43 @@ class Animated:
         self.state.tick()
         p = self.state.current()
         self.renderer.step(dt, p)
-        img = self.renderer.draw(p)
+        img = self.renderer.draw(p, self._tint(dt))
         path = self.dir / f"frame{self.ring}.png"
         self.ring = (self.ring + 1) % RING
         save_png(img, path)
         return path
 
 
+class Motion:
+    """Owns the motion source (camera or synthetic) and the motion mask."""
+
+    def __init__(self, settings, source):
+        from .camera import Burst, MotionField
+
+        self.settings = settings
+        self.source = source
+        self.field = MotionField(settings)
+        self.burst = Burst(settings.burst, settings.burst_rest)
+        self.is_open = False
+        self.failed = False
+        self.last_t = 0.0
+
+    def open(self) -> None:
+        self.last_t = 0.0
+        self.source.open()
+        self.is_open = True
+
+    def close(self) -> None:
+        self.is_open = False
+        try:
+            self.source.close()
+        finally:
+            self.field.reset()
+            self.burst.reset()
+
+
 class Daemon:
-    def __init__(self, connection, cfg, overrides, verbose=False):
+    def __init__(self, connection, cfg, overrides, verbose=False, motion_demo=False):
         self.conn = connection
         self.cfg = cfg
         self.d = cfg["daemon"]
@@ -84,8 +128,173 @@ class Daemon:
         self.sprites = SpriteCache(cfg["render"])
         self.stop = asyncio.Event()
         self.wake = asyncio.Event()
+        self.motion_wake = asyncio.Event()
         self.sock: socket.socket | None = None
         self.warned_missing: set[str] = set()
+        self.motion_demo = motion_demo
+        self.status_component = None
+        self.motion = self._make_motion(motion_demo or self._camera_setting())
+
+    def _camera_setting(self) -> bool:
+        return bool(self.cfg.get("camera", {}).get("enabled", False))
+
+    def _make_motion(self, enabled: bool):
+        from .camera import CameraSettings, CameraSource, SyntheticSource
+
+        settings = CameraSettings.from_cfg(self.cfg)
+        if not enabled:
+            return None
+        if self.motion_demo:
+            log("motion: --motion-demo, synthetic silhouette (the camera is never opened)")
+            return Motion(settings, SyntheticSource(fps=settings.fps))
+        try:
+            import AVFoundation  # noqa: F401
+        except Exception as exc:  # noqa: BLE001
+            log(f"camera: packages not installed ({exc.__class__.__name__}); running without the camera "
+                "(./install.sh --camera)")
+            return None
+        log(f"camera: enabled, opens {'only while the rain animates at full rate' if settings.only_when_active else 'while sessions animate'}")
+        return Motion(settings, CameraSource(settings.device, settings.fps))
+
+    # ------------------------------------------------------------ camera toggle
+    def status_text(self) -> str:
+        if self.motion is None:
+            return "○ camera off"
+        if self.motion_demo:
+            return "◉ camera demo"
+        return "◉ camera on"
+
+    async def set_camera(self, enabled: bool, why: str = "") -> bool:
+        """Turn the camera tint on or off now and save `[camera] enabled`.
+
+        Returns the resulting state.  Turning on respects only_when_active:
+        the camera opens at once if a Matrix session is animating at full
+        rate, otherwise when one is.
+        """
+        loop = asyncio.get_running_loop()
+        if enabled and self.motion is None:
+            m = self._make_motion(True)
+            if m is None:
+                log("camera: cannot turn on (packages missing); setting left unchanged")
+                await self.refresh_status()
+                return False
+            self.motion = m
+        elif not enabled and self.motion is not None:
+            m, self.motion = self.motion, None
+            if m.is_open:
+                await loop.run_in_executor(None, m.close)
+                log(f"{m.source.name}: closed")
+        for a in self.sessions.values():
+            a.motion = self.motion
+            a.heat = None
+        self.cfg.setdefault("camera", {})["enabled"] = enabled
+        try:
+            path = await loop.run_in_executor(None, lambda: config.set_key("camera", "enabled", enabled))
+            saved = f"saved to {path}"
+        except Exception as exc:  # noqa: BLE001
+            saved = f"not saved ({exc})"
+        log(f"camera: turned {'on' if enabled else 'off'}{' from ' + why if why else ''}; {saved}")
+        self.motion_wake.set()
+        self.wake.set()
+        await self.refresh_status()
+        return self.motion is not None
+
+    async def toggle_camera(self, why: str = "") -> bool:
+        return await self.set_camera(self.motion is None, why)
+
+    async def refresh_status(self) -> None:
+        """Make iTerm2 re-evaluate the status bar text in animated sessions."""
+        if self.app is None or self.status_component is None:
+            return
+        value = self.status_text()
+        for a in list(self.sessions.values()):
+            s = self.app.get_session_by_id(a.sid)
+            if s is None:
+                continue
+            try:
+                await asyncio.wait_for(s.async_set_variable("user.matrixRainCamera", value), timeout=3)
+            except Exception as exc:  # noqa: BLE001
+                if self.verbose:
+                    log(f"status refresh failed for {a.sid}: {exc}")
+
+    async def register_status_bar(self) -> None:
+        """Register the clickable "Matrix rain camera" status bar component."""
+        import iterm2
+
+        daemon = self
+        component = iterm2.StatusBarComponent(
+            short_description="Matrix rain camera",
+            detailed_description="Shows whether iterm2-matrix-rain's camera motion tint is on.  Click to turn it on or off.",
+            knobs=[],
+            exemplar="◉ camera on",
+            update_cadence=None,
+            identifier="us.epel.iterm2-matrix-rain.camera",
+        )
+
+        @iterm2.StatusBarRPC
+        async def matrix_rain_camera_status(knobs, camera=iterm2.Reference("user.matrixRainCamera?")):
+            return daemon.status_text()
+
+        async def on_click(session_id):
+            await daemon.toggle_camera(f"the status bar ({session_id[:8]})")
+
+        try:
+            await asyncio.wait_for(component.async_register(self.conn, matrix_rain_camera_status, onclick=on_click),
+                                   timeout=10)
+            self.status_component = component
+            log("status bar: registered \"Matrix rain camera\" (us.epel.iterm2-matrix-rain.camera)")
+        except Exception as exc:  # noqa: BLE001
+            log(f"status bar: not registered ({exc.__class__.__name__}: {exc}); running without it")
+
+    async def motion_loop(self) -> None:
+        """Open the source only while wanted, and feed frames into the mask."""
+        loop = asyncio.get_running_loop()
+        m = None
+        try:
+            while not self.stop.is_set():
+                m = self.motion
+                if m is None:
+                    self.motion_wake.clear()
+                    try:
+                        await asyncio.wait_for(self.motion_wake.wait(), timeout=1.0)
+                    except asyncio.TimeoutError:
+                        pass
+                    continue
+                period = 1.0 / m.settings.fps
+                fast = any(self.focused(a.sid) for a in self.sessions.values())
+                # The synthetic demo never touches the camera, so it ignores only_when_active.
+                gate = m.settings.only_when_active and m.source.name != "synthetic"
+                want = bool(self.sessions) and (fast or not gate) and not m.failed
+                if want and not m.is_open:
+                    try:
+                        await loop.run_in_executor(None, m.open)
+                        note = getattr(m.source, "rate_note", "")
+                        log(f"{m.source.name}: opened" + (f"; {note}" if note else "")
+                            + f"; warming up {m.settings.warmup:g} s before tinting")
+                    except Exception as exc:  # noqa: BLE001
+                        m.failed = True
+                        log(f"{m.source.name}: unavailable ({exc}); running without it")
+                elif not want and m.is_open:
+                    m.close()
+                    log(f"{m.source.name}: closed")
+                if m.is_open:
+                    frame = m.source.read()   # None unless a new frame arrived
+                    if frame is not None:
+                        t = m.source.last_time
+                        dt = t - m.last_t if m.last_t else 1.0 / m.settings.fps
+                        m.last_t = t
+                        m.field.feed(frame, dt)
+                        if m.field.mask is not None:          # past the warm-up gate
+                            m.burst.update(m.field.coverage(), t)
+                try:
+                    await asyncio.wait_for(self.stop.wait(), timeout=period)
+                except asyncio.TimeoutError:
+                    pass
+        finally:
+            m = self.motion
+            if m is not None and m.is_open:
+                m.close()
+                log(f"{m.source.name}: closed")
 
     # ------------------------------------------------------------ helpers
     def focused(self, sid: str) -> bool:
@@ -159,6 +368,7 @@ class Daemon:
                             continue
                         tty = await s.async_get_variable("tty")
                         a = Animated(s, tty, cols, rows, self.cfg, self.sprites)
+                        a.motion = self.motion
                         try:
                             a.orig_blend = (await s.async_get_profile()).blend
                         except Exception:
@@ -304,6 +514,7 @@ class Daemon:
         for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
             loop.add_signal_handler(sig, self.stop.set)
         self.open_socket()
+        await self.register_status_bar()
         log(f"matrix-rain daemon pid {os.getpid()}, socket {config.SOCKET_PATH}, "
             f"fps {self.d.get('fps')}, font {self.sprites.font_path}, "
             + (f"sessions {sorted(self.overrides)}" if self.overrides
@@ -313,7 +524,7 @@ class Daemon:
             await self.app.async_refresh()
             await self.discover()
             tasks += [asyncio.create_task(t) for t in
-                      (self.discover_loop(), self.render_loop(), self.focus_loop())]
+                      (self.discover_loop(), self.render_loop(), self.focus_loop(), self.motion_loop())]
             await self.stop.wait()
         finally:
             log("stopping")
@@ -407,7 +618,8 @@ def main(args) -> int:
 
     async def entry(connection):
         watchdog.cancel()
-        await Daemon(connection, cfg, args.session, verbose=args.verbose).run()
+        await Daemon(connection, cfg, args.session, verbose=args.verbose,
+                     motion_demo=getattr(args, "motion_demo", False)).run()
 
     watchdog.start()
     try:
