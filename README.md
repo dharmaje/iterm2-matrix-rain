@@ -77,6 +77,60 @@ Each time the daemon starts, before it connects to iTerm2, it:
 The check runs at most once an hour.  `matrix-rain daemon --update-now` or `matrix-rain update` forces it, and `matrix-rain version` prints the project version, the iTerm2 version it was built for and the installed one.  To turn updates off, or only be notified, put this in `~/.config/iterm2-matrix-rain/config.toml`:
 
 ```toml
+[update]
+auto = false          # skip the update step entirely
+# check_only = true   # or: notify that an update exists, change nothing
+```
+
+## Claude Code hooks
+
+`./install.sh --hooks` prints the block below with your clone's path filled in.  Merge it into `~/.claude/settings.json`; the installer never edits that file.
+
+```json
+{
+  "hooks": {
+    "SessionStart":       [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "UserPromptSubmit":   [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "PreToolUse":         [{ "matcher": "*", "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "PostToolUse":        [{ "matcher": "*", "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "PermissionRequest":  [{ "matcher": "*", "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "Notification":       [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "Stop":               [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "StopFailure":        [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "SubagentStop":       [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
+    "SessionEnd":         [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }]
+  }
+}
+```
+
+The hook prints nothing to stdout, hands the event to a background process and always exits 0, so it never slows or blocks Claude Code.
+
+## States
+
+| Claude Code event | State | Look |
+|---|---|---|
+| SessionStart | idle | deep dim green, slow, sparse |
+| UserPromptSubmit, PreToolUse, PostToolUse | working | brighter green, faster, denser |
+| Notification (permission_prompt, idle_prompt), PermissionRequest | waiting | amber, slow |
+| PostToolUseFailure, StopFailure | error | muted crimson for about 4 s, then back to the previous state |
+| Stop, SubagentStop | done | cool cyan-white for about 4 s, then idle |
+| SessionEnd | off | fades to almost nothing |
+
+Every change eases over about a second.  Events that arrive during an error or done hold update where the rain returns to, without cutting the hold short.
+
+Send a state by hand:
+
+```bash
+.venv/bin/matrix-rain event working
+.venv/bin/matrix-rain event --tty /dev/ttys003 waiting
+```
+
+## Configuration
+
+Put overrides in `~/.config/iterm2-matrix-rain/config.toml`.  Any key you leave out keeps its default, and the daemon reads the file at start-up.  The defaults:
+
+```toml
 # iterm2-matrix-rain defaults.
 # Copy any part of this file to ~/.config/iterm2-matrix-rain/config.toml to override it.
 # Colors are [r, g, b] in 0-255.  Speeds are glyph cells per second.
@@ -176,156 +230,6 @@ head = [190, 230, 235]
 speed = 6.0
 density = 0.34
 brightness = 0.85
-mutation = 0.8
-hold = 4.0
-next = "idle"
-
-[states.off]
-background = [1, 2, 1]
-tail = [10, 40, 20]
-head = [40, 70, 50]
-speed = 2.0
-density = 0.03
-brightness = 0.12
-mutation = 0.2
-```
-
-## Claude Code hooks
-
-`./install.sh --hooks` prints the block below with your clone's path filled in.  Merge it into `~/.claude/settings.json`; the installer never edits that file.
-
-```json
-{
-  "hooks": {
-    "SessionStart":       [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "UserPromptSubmit":   [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "PreToolUse":         [{ "matcher": "*", "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "PostToolUse":        [{ "matcher": "*", "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "PermissionRequest":  [{ "matcher": "*", "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "Notification":       [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "Stop":               [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "StopFailure":        [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "SubagentStop":       [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }],
-    "SessionEnd":         [{ "hooks": [{ "type": "command", "command": "/path/to/iterm2-matrix-rain/hooks/claude-code-hook.sh", "timeout": 5 }] }]
-  }
-}
-```
-
-The hook prints nothing to stdout, hands the event to a background process and always exits 0, so it never slows or blocks Claude Code.
-
-## States
-
-| Claude Code event | State | Look |
-|---|---|---|
-| SessionStart | idle | deep dim green, slow, sparse |
-| UserPromptSubmit, PreToolUse, PostToolUse | working | brighter green, faster, denser |
-| Notification (permission_prompt, idle_prompt), PermissionRequest | waiting | amber, slow |
-| PostToolUseFailure, StopFailure | error | muted crimson for about 4 s, then back to the previous state |
-| Stop, SubagentStop | done | cool cyan-white for about 4 s, then idle |
-| SessionEnd | off | fades to almost nothing |
-
-Every change eases over about a second.  Events that arrive during an error or done hold update where the rain returns to, without cutting the hold short.
-
-Send a state by hand:
-
-```bash
-.venv/bin/matrix-rain event working
-.venv/bin/matrix-rain event --tty /dev/ttys003 waiting
-```
-
-## Configuration
-
-Put overrides in `~/.config/iterm2-matrix-rain/config.toml`.  Any key you leave out keeps its default, and the daemon reads the file at start-up.  The defaults:
-
-```toml
-# iterm2-matrix-rain defaults.
-# Copy any part of this file to ~/.config/iterm2-matrix-rain/config.toml to override it.
-# Colors are [r, g, b] in 0-255.  Speeds are glyph cells per second.
-
-[daemon]
-profile = "Matrix"        # animate sessions whose profile has this name
-fps = 6.0                 # frames per second for the focused window
-idle_interval = 2.0       # seconds between frames for unfocused sessions
-blend = 0.6               # iTerm2 Blend while animating; higher shows more rain, lower more background color
-max_width = 1200          # frame width cap in pixels; iTerm2 stretches the frame
-px_per_col = 8            # frame pixels per terminal column
-px_per_row = 16           # frame pixels per terminal row
-transition = 1.0          # seconds to ease between states
-discover_interval = 5.0   # seconds between scans for sessions to animate
-
-[render]
-cell_width = 12           # rain glyph cell size in frame pixels
-cell_height = 16
-font_size = 14
-mirror = true             # mirror glyphs horizontally, as in the film
-glow = 0.55               # strength of the soft halo around each glyph
-glow_radius = 2.0
-tail_min = 8              # tail length range in cells
-tail_max = 26
-tail_gamma = 1.6          # higher = tail fades sooner
-buckets = 16              # brightness levels cached per glyph
-fonts = [
-  "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
-  "/System/Library/Fonts/Hiragino Sans GB.ttc",
-  "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
-  "/Library/Fonts/Arial Unicode.ttf",
-]
-latin_fonts = [
-  "/System/Library/Fonts/Menlo.ttc",
-  "/System/Library/Fonts/Monaco.ttf",
-]
-
-# Each state: tail and head colors, background, speed, density (share of
-# columns running a stream), brightness (overall multiplier) and mutation
-# (glyph changes per cell per second).  Transient states also have
-# hold (seconds) and next ("previous" or a state name).
-
-[states.idle]
-background = [2, 6, 4]
-tail = [20, 120, 55]
-head = [120, 200, 150]
-speed = 5.0
-density = 0.22
-brightness = 0.55
-mutation = 0.6
-
-[states.working]
-background = [2, 7, 4]
-tail = [30, 165, 75]
-head = [160, 235, 185]
-speed = 10.0
-density = 0.42
-brightness = 0.75
-mutation = 1.4
-
-[states.waiting]
-background = [7, 5, 2]
-tail = [150, 105, 25]
-head = [235, 200, 130]
-speed = 3.5
-density = 0.26
-brightness = 0.65
-mutation = 0.5
-
-[states.error]
-background = [8, 3, 3]
-tail = [140, 35, 40]
-head = [215, 140, 140]
-speed = 6.0
-density = 0.32
-brightness = 0.65
-mutation = 1.0
-hold = 4.0
-next = "previous"
-
-[states.done]
-background = [3, 6, 8]
-tail = [60, 150, 165]
-head = [190, 230, 235]
-speed = 6.0
-density = 0.30
-brightness = 0.70
 mutation = 0.8
 hold = 4.0
 next = "idle"
