@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 from . import config
 from .render import Renderer, frame_size
@@ -400,6 +400,13 @@ def test_camera(cfg) -> bool:
     g1 = Tint.from_settings(Image.new("L", (8, 6), 255), st_gain, 1.0).gain
     ok &= check("gain 1.5 applies without a burst", abs(g0 - 1.5) < 1e-6, f"{g0}")
     ok &= check("burst multiplies the gain", abs(g1 - 1.5 * 1.7) < 1e-6, f"{g1}")
+
+    from .camera import outline
+    blob_mask = Image.new("L", (320, 240), 0)
+    ImageDraw.Draw(blob_mask).ellipse((100, 60, 220, 200), fill=255)
+    thin = outline(blob_mask, 1).point(lambda v: 255 if v > 127 else 0).histogram()[255]
+    thick = outline(blob_mask, 3).point(lambda v: 255 if v > 127 else 0).histogram()[255]
+    ok &= check("outline_width 3 is thicker than 1", thick > 2 * thin, f"{thin} vs {thick} px")
     ok &= check("heat dilates one cell", _dilation_ok())
 
     # Tint: every channel stays between the plain and the fully gold frame.

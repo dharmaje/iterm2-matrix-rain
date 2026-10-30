@@ -43,6 +43,7 @@ class CameraSettings:
     fill: float = 0.4
     warmup: float = 1.5
     shape: str = "outline"
+    outline_width: int = 3
     burst: float = 3.0
     burst_rest: float = 2.0
     burst_strength: float = 1.4
@@ -71,6 +72,7 @@ class CameraSettings:
             fill=min(1.0, max(0.0, float(c.get("fill", d.fill)))),
             warmup=max(0.0, float(c.get("warmup", d.warmup))),
             shape="fill" if str(c.get("shape", d.shape)).lower() == "fill" else "outline",
+            outline_width=max(1, min(8, int(c.get("outline_width", d.outline_width)))),
             burst=max(0.0, float(c.get("burst", d.burst))),
             burst_rest=max(0.0, float(c.get("burst_rest", d.burst_rest))),
             burst_strength=max(1.0, float(c.get("burst_strength", d.burst_strength))),
@@ -436,7 +438,7 @@ class MotionField:
         self.prev = frame
         moving = moving.filter(ImageFilter.GaussianBlur(1.5))
         self.filled = moving
-        self.raw_mask = outline(moving) if self.s.shape == "outline" else moving
+        self.raw_mask = outline(moving, self.s.outline_width) if self.s.shape == "outline" else moving
         if self.bg is not frame:
             self.elapsed += max(0.0, min(dt, 1.0))
         # Warm-up gate: while the background settles after the camera opens,
@@ -469,15 +471,16 @@ def solid_blob(mask: Image.Image) -> Image.Image:
     return half
 
 
-def outline(mask: Image.Image) -> Image.Image:
+def outline(mask: Image.Image, width: int = 3) -> Image.Image:
     """The edge of the moving shape: blob minus its erosion.
 
-    Worked at half size, so the edge is about 2 to 3 camera pixels wide once
-    scaled back, enough to survive the downsample to rain cells, at a cost
-    of about 1 ms per camera frame.
+    Worked at half size; `width` is the edge thickness in half-size pixels
+    (about 2 * width camera pixels once scaled back), enough to survive the
+    downsample to rain cells, at a cost of about 1 ms per camera frame.
     """
     blob = solid_blob(mask)
-    edge = ImageChops.subtract(blob, blob.filter(ImageFilter.MinFilter(3)))
+    k = 2 * max(1, int(width)) + 1
+    edge = ImageChops.subtract(blob, blob.filter(ImageFilter.MinFilter(k)))
     return edge.resize(mask.size, Image.Resampling.BILINEAR)
 
 
