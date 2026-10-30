@@ -88,6 +88,10 @@ auto = false          # skip the update step entirely
 # check_only = true   # or: notify that an update exists, change nothing
 ```
 
+## Shortcut scripts
+
+`scripts/` has three zsh helpers you can run directly or alias: `enable-matrix-profile.zsh` switches the current iTerm2 session to the Matrix profile, and `enable-camera.zsh` and `disable-camera.zsh` turn camera motion on or off and restart the daemon.  Each prints help without arguments and acts with `--run`.  See [scripts/README.md](scripts/README.md) for aliases.
+
 ## Claude Code hooks
 
 `./install.sh --hooks` prints the block below with your clone's path filled in.  Merge it into `~/.claude/settings.json`; the installer never edits that file.
