@@ -15,7 +15,7 @@ iTerm2 does not animate GIF backgrounds.  A small daemon renders soft PNG frames
 
 ## Camera motion (optional, off by default)
 
-With the camera turned on, the rain draws a gold outline around whatever moves in front of the Mac's camera, such as you, and fades back over a second and a half.  The gold is stronger for the first few seconds after you start moving.  It is off until you run `matrix-rain camera enable`, and nothing is recorded or stored.  See [Camera motion](#camera-motion) for details.
+With the camera turned on, the rain draws a gold outline around whatever moves in front of the Mac's camera, such as you, and fades back over about five seconds.  The gold is stronger for the first few seconds after you start moving.  It is off until you run `matrix-rain camera enable`, and nothing is recorded or stored.  See [Camera motion](#camera-motion) for details.
 
 ![Motion tint](docs/preview-motion.png)
 
@@ -163,17 +163,17 @@ pkill -f 'matrix[-_]rain daemon'; osascript ~/Library/Application\ Support/iTerm
 | Key under `[camera]` | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Use the camera at all |
-| `tint` | `[230, 180, 60]` | Tail color where something moved |
-| `head_tint` | `[255, 232, 150]` | Head color where something moved |
-| `fade` | `1.5` | Seconds for a cell to return to normal after motion stops |
+| `tint` | `[250, 205, 80]` | Tail color where something moved |
+| `head_tint` | `[255, 245, 200]` | Head color where something moved |
+| `fade` | `5.0` | Seconds for a cell to return to normal after motion stops |
 | `sensitivity` | `0.5` | 0 reacts only to large changes, 1 to small ones too; 0.5 is a 24 gray-level threshold, which `camera test` prints |
 | `strength` | `1.0` | How far moving cells shift toward the tint, 0 to 1 |
 | `shape` | `"outline"` | `"outline"`: the gold edge of what moved; `"fill"`: the whole moving area |
 | `burst` | `3.0` | Seconds of stronger gold when motion starts after a rest |
 | `burst_rest` | `2.0` | Seconds of stillness before the next motion bursts |
-| `burst_strength` | `1.4` | Brightness multiplier for gold cells during a burst |
-| `burst_tint`, `burst_head_tint` | `[245, 200, 80]`, `[255, 245, 190]` | Tail and head colors during a burst |
-| `fill` | `0.4` | Dim glyphs lit in moving cells where no rain falls, so the shape reads; 0 turns it off |
+| `burst_strength` | `1.7` | Brightness multiplier for gold cells during a burst |
+| `burst_tint`, `burst_head_tint` | `[255, 220, 110]`, `[255, 252, 225]` | Tail and head colors during a burst |
+| `fill` | `0.7` | Dim glyphs lit in moving cells where no rain falls, so the shape reads; 0 turns it off |
 | `fps` | `10` | Camera frames per second; the camera is asked for this rate and extra frames are dropped |
 | `warmup` | `1.5` | Seconds after the camera opens before any tint, while the background settles |
 | `mirror` | `true` | Flip horizontally so motion reads like a mirror |
@@ -222,20 +222,20 @@ min_interval = 3600       # seconds between checks
 # animates at full rate, unless only_when_active = false.
 [camera]
 enabled = false
-tint = [230, 180, 60]        # tail color where something moved
-head_tint = [255, 232, 150]  # head color where something moved
-fade = 1.5                   # seconds for a cell to fade back after motion stops
+tint = [250, 205, 80]        # tail color where something moved
+head_tint = [255, 245, 200]  # head color where something moved
+fade = 5.0                   # seconds for a cell to fade back after motion stops
 sensitivity = 0.5            # 0 = only large changes, 1 = small changes too
 strength = 1.0               # 0..1, how far moving cells shift toward the tint
-fill = 0.4                   # 0..1, dim glyphs lit in moving cells where no rain falls; 0 = off
+fill = 0.7                   # 0..1, dim glyphs lit in moving cells where no rain falls; 0 = off
 fps = 10                     # camera frames per second (extra frames are dropped)
 warmup = 1.5                 # seconds after the camera opens before any tint
 shape = "outline"            # "outline": gold edge of what moved; "fill": the whole area
 burst = 3.0                  # seconds of stronger gold when motion starts after a rest
 burst_rest = 2.0             # seconds without motion before the next motion bursts
-burst_strength = 1.4         # brightness multiplier for moving cells during a burst
-burst_tint = [245, 200, 80]  # tail color during a burst
-burst_head_tint = [255, 245, 190]  # head color during a burst
+burst_strength = 1.7         # brightness multiplier for moving cells during a burst
+burst_tint = [255, 220, 110] # tail color during a burst
+burst_head_tint = [255, 252, 225]  # head color during a burst
 mirror = true                # move like a mirror image of you
 only_when_active = true      # open the camera only while iTerm2 is frontmost
 device = ""                  # part of a camera's name; empty = default camera
