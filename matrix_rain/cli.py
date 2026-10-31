@@ -14,14 +14,19 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 HELP = f"""\
-matrix-rain: soft animated digital rain behind iTerm2 text, driven by Claude Code hooks.
+matrix-rain: soft animated digital rain behind iTerm2 text, or full-screen in any
+terminal, driven by Claude Code hooks.
 
 Commands:
-  daemon     Animate opted-in iTerm2 sessions (profile named "Matrix" by default).
+  run        Start the right backend here: the iTerm2 daemon on macOS inside iTerm2,
+             the text rain (term) everywhere else.
+  term       Full-screen text rain in this terminal (any OS).  q quits, 1-6 force a state.
+  platform   Print the OS and terminal detected and which backend run would start.
+  daemon     Animate opted-in iTerm2 sessions (profile named "Matrix" by default; macOS).
   event      Tell the daemon this terminal's state changed (idle, working, waiting,
              error, done, off).  Always exits 0, even when the daemon is not running.
   preview    Render one frame to a PNG without iTerm2.
-  bench      Measure render and PNG encode time per frame.
+  bench      Measure render and PNG encode time per frame (--term: text rain).
   selftest   Run the built-in checks (no iTerm2 needed).
   camera     Optional camera motion tint: enable, disable, status, test.
   update     Fast-forward this clone from origin now (clean clone only), then exit.
@@ -29,12 +34,17 @@ Commands:
              and the installed iTerm2 version.
 
 Examples:
+  matrix-rain run
+  matrix-rain term --demo
+  matrix-rain term --follow tty:/dev/pts/3
+  matrix-rain platform
   matrix-rain daemon
   matrix-rain daemon --session <session-id>
   matrix-rain event working
   matrix-rain event --tty /dev/ttys003 waiting
   matrix-rain preview docs/preview-working.png --state working
   matrix-rain bench --cols 209 --rows 51
+  matrix-rain bench --term --cols 200 --rows 50
   matrix-rain selftest
   matrix-rain preview docs/preview-motion.png --state working --motion-demo
   matrix-rain bench --motion
@@ -112,19 +122,35 @@ def resolve_target(env: dict | None = None) -> dict:
 
 
 def send_event(state: str, tty: str | None, session: str | None) -> bool:
-    from .config import SOCKET_PATH
+    """Send to the iTerm2 daemon and to every running term (CACHE_DIR/term/*.sock).
+
+    True when at least one listener took it.  A missing, stale or full socket
+    is skipped; term removes stale ones when it starts.
+    """
+    from . import config
 
     msg = json.dumps({"state": state, "tty": tty, "session": session}).encode()
+    targets = [config.SOCKET_PATH]
+    try:
+        targets += sorted((config.CACHE_DIR / "term").glob("*.sock"))   # term.socket_dir()
+    except OSError:
+        pass
+    delivered = False
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        s.setblocking(False)
-        try:
-            s.sendto(msg, str(SOCKET_PATH))
-        finally:
-            s.close()
-        return True
     except OSError:
         return False
+    try:
+        s.setblocking(False)
+        for path in targets:
+            try:
+                s.sendto(msg, str(path))
+                delivered = True
+            except OSError:
+                pass
+    finally:
+        s.close()
+    return delivered
 
 
 def cmd_event(args) -> int:
@@ -144,12 +170,12 @@ def cmd_event(args) -> int:
 
 # ---------------------------------------------------------------- preview / bench
 
-def _sim(cols, rows, state, seconds, fps, seed=7):
+def _sim(cols, rows, state, seconds, fps, seed=7, cfg=None):
     from . import config
     from .render import Renderer, frame_size
     from .state import StateModel
 
-    cfg = config.load()
+    cfg = cfg or config.load()
     w, h = frame_size(cols, rows, cfg["daemon"])
     r = Renderer(w, h, cfg["render"], seed=seed)
     p = StateModel(cfg).palettes[state]
@@ -189,10 +215,34 @@ def cmd_preview(args) -> int:
     return 0
 
 
+def p95(xs):
+    return sorted(xs)[max(0, int(len(xs) * 0.95) - 1)]
+
+
+def cmd_bench_term(args) -> int:
+    import statistics
+
+    from . import config, term
+
+    cfg = config.load()
+    res = term.bench(cfg, args.cols, args.rows, args.state, args.frames, color=args.color or "auto")
+    total = [a + b for a, b in zip(res["step"], res["encode"])]
+    print(f"text rain {args.cols}x{args.rows}, state {args.state}, {res['mode']} color, {res['glyphs']} glyphs, "
+          f"{args.frames} frames at 20 fps steps")
+    for name, xs in (("step", res["step"]), ("encode", res["encode"]), ("total", total)):
+        print(f"{name:7s} mean {statistics.mean(xs):6.2f} ms   p95 {p95(xs):6.2f} ms")
+    b = res["bytes"]
+    print(f"bytes   mean {statistics.mean(b) / 1024:6.1f} KB   p95 {p95(b) / 1024:6.1f} KB per frame; "
+          f"first full frame {res['first'] / 1024:.1f} KB")
+    return 0
+
+
 def cmd_bench(args) -> int:
     import io
     import statistics
 
+    if args.term:
+        return cmd_bench_term(args)
     from . import config
     from .render import Renderer, SpriteCache, frame_size
 
@@ -227,10 +277,6 @@ def cmd_bench(args) -> int:
         draw_ms.append((t2 - t1) * 1000)
         enc_ms.append((t3 - t2) * 1000)
     total = [a + b + c for a, b, c in zip(step_ms, draw_ms, enc_ms)]
-
-    def p95(xs):
-        return sorted(xs)[int(len(xs) * 0.95) - 1]
-
     print(f"grid {args.cols}x{args.rows} -> frame {w}x{h}, state {args.state}, "
           f"motion tint {'on (synthetic source; step includes camera processing)' if args.motion else 'off'}, "
           f"{len(sprites.glyphs)} glyphs, font {sprites.font_path}")
@@ -253,6 +299,10 @@ def cmd_camera(args) -> int:
     from . import config
     from .camera import CameraSettings
 
+    mac = sys.platform == "darwin"
+    if args.action == "enable" and not mac:
+        print("The camera motion tint is macOS only (AVFoundation); nothing changed.")
+        return 0
     if args.action in ("enable", "disable"):
         path = config.set_key("camera", "enabled", args.action == "enable")
         print(f"camera {args.action}d in {path}")
@@ -261,9 +311,17 @@ def cmd_camera(args) -> int:
                 import AVFoundation  # noqa: F401
             except Exception:
                 print("The camera packages are not installed yet; run ./install.sh --camera")
-        print(RESTART_HINT)
+        if mac:
+            print(RESTART_HINT)
         return 0
     s = CameraSettings.from_cfg(config.load())
+    if args.action == "status" and not mac:
+        print(f"camera enabled: {'yes' if s.enabled else 'no'}  (config: {config.CONFIG_PATH})")
+        print("camera packages: macOS only (the text rain has no camera tint)")
+        return 0
+    if args.action == "test" and not mac and not args.synthetic:
+        print("camera test needs macOS (AVFoundation); --synthetic tests the motion pipeline here.")
+        return 1
     if args.action == "status":
         try:
             import AVFoundation  # noqa: F401
@@ -340,7 +398,74 @@ def cmd_camera(args) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- term / run / platform
+
+DAEMON_NEEDS_MACOS = ("matrix-rain daemon drives iTerm2 and needs macOS.  "
+                      "Here, run `matrix-rain term` (or `matrix-rain run`) for the text rain.")
+
+
+def cmd_term(args) -> int:
+    from . import config, term
+
+    cfg = config.load()
+    try:
+        opts = term.options(cfg, args)
+    except ValueError as exc:
+        print(f"matrix-rain term: {exc}", file=sys.stderr)
+        return 2
+    return term.TermRain(cfg, **opts).run()
+
+
+def cmd_run(args) -> int:
+    from .platform import detect
+
+    info = detect()
+    if info["backend"] == "iterm2":
+        from .daemon import main as daemon_main
+        return daemon_main(args)
+    return cmd_term(args)
+
+
+def cmd_platform(args) -> int:
+    from . import config, term
+    from .platform import detect
+
+    info = detect()
+    cfg = config.load()
+    setting = str(cfg.get("terminal", {}).get("color", "auto"))
+    os_line = " ".join(x for x in (info["os"], info["os_version"]) if x)
+    print(f"os        {os_line}")
+    print(f"backend   {info['backend']}  (matrix-rain run starts {'the iTerm2 daemon' if info['backend'] == 'iterm2' else 'the text rain'})")
+    print(f"reason    {info['reason']}")
+    env = os.environ
+    print(f"terminal  TERM={env.get('TERM', '')} COLORTERM={env.get('COLORTERM', '')} "
+          f"TERM_PROGRAM={env.get('TERM_PROGRAM', '')}")
+    print(f"colors    {term.color_mode(setting)} for the text rain ([terminal] color = {setting!r})")
+    print(f"tmux      {'yes, client ' + str(_tmux_client_tty(dict(env))) if env.get('TMUX') else 'no'}")
+    return 0
+
+
 # ---------------------------------------------------------------- main
+
+def _daemon_args(d) -> None:
+    d.add_argument("--session", action="append", default=[],
+                   help="animate this session id only (repeatable); skips the profile-name opt-in")
+    d.add_argument("--fps", type=float, help="override [daemon] fps (or [terminal] fps for the text rain)")
+    d.add_argument("--motion-demo", action="store_true",
+                   help="feed a synthetic moving silhouette instead of the camera (never opens the camera)")
+    d.add_argument("--update-now", action="store_true",
+                   help="run the self-update step even if it ran within the last hour")
+    d.add_argument("--verbose", "-v", action="store_true")
+
+
+def _term_args(t, fps: bool = True) -> None:
+    if fps:
+        t.add_argument("--fps", type=float, help="override [terminal] fps")
+    t.add_argument("--color", choices=["auto", "truecolor", "256"], help="override [terminal] color")
+    t.add_argument("--glyphs", choices=["katakana", "ascii"], help="override [terminal] glyphs")
+    t.add_argument("--follow", help="auto, any or tty:/dev/pts/N: whose events to follow (override [terminal] follow)")
+    t.add_argument("--demo", action="store_true", help="cycle through the states, no hooks needed")
+
 
 def build_parser() -> argparse.ArgumentParser:
     from .config import STATES
@@ -349,15 +474,14 @@ def build_parser() -> argparse.ArgumentParser:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd")
 
-    d = sub.add_parser("daemon", help="animate opted-in iTerm2 sessions")
-    d.add_argument("--session", action="append", default=[],
-                   help="animate this session id only (repeatable); skips the profile-name opt-in")
-    d.add_argument("--fps", type=float, help="override [daemon] fps")
-    d.add_argument("--motion-demo", action="store_true",
-                   help="feed a synthetic moving silhouette instead of the camera (never opens the camera)")
-    d.add_argument("--update-now", action="store_true",
-                   help="run the self-update step even if it ran within the last hour")
-    d.add_argument("--verbose", "-v", action="store_true")
+    d = sub.add_parser("daemon", help="animate opted-in iTerm2 sessions (macOS)")
+    _daemon_args(d)
+    t = sub.add_parser("term", help="full-screen text rain in this terminal")
+    _term_args(t)
+    r = sub.add_parser("run", help="start the iTerm2 daemon or the text rain, whichever fits here")
+    _daemon_args(r)
+    _term_args(r, fps=False)
+    sub.add_parser("platform", help="print what was detected and which backend run would start")
 
     e = sub.add_parser("event", help="send a state change for this terminal")
     e.add_argument("state", choices=STATES)
@@ -379,6 +503,8 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--state", choices=STATES, default="working")
     b.add_argument("--frames", type=int, default=120)
     b.add_argument("--motion", action="store_true", help="include the camera motion tint (synthetic source)")
+    b.add_argument("--term", action="store_true", help="measure the text rain instead: ms and bytes per frame")
+    b.add_argument("--color", choices=["auto", "truecolor", "256"], help="with --term: color mode to measure")
 
     sub.add_parser("selftest", help="run built-in checks")
     c = sub.add_parser("camera", help="enable, disable, check or test the optional camera motion tint")
@@ -422,14 +548,22 @@ def main(argv: list[str] | None = None) -> int:
         import json
 
         from .statusbar import layout_entry
-        print(json.dumps(layout_entry(), indent=2, ensure_ascii=False))
+        try:
+            entry = layout_entry()
+        except ImportError:
+            print("status-component needs the iterm2 package, which is installed on macOS only.", file=sys.stderr)
+            return 2
+        print(json.dumps(entry, indent=2, ensure_ascii=False))
         return 0
     if args.cmd == "version":
         from . import BUILT_FOR_ITERM2, __version__
         from .versions import compare, installed_iterm2
 
-        installed = installed_iterm2()
         print(f"iterm2-matrix-rain {__version__}")
+        if sys.platform != "darwin":
+            print("iTerm2 checks skipped (macOS only); this system uses the text rain (matrix-rain term)")
+            return 0
+        installed = installed_iterm2()
         print(f"built for iTerm2 {BUILT_FOR_ITERM2}")
         print(f"installed iTerm2 {installed or 'not found'} ({compare(installed)})")
         return 0
@@ -442,7 +576,16 @@ def main(argv: list[str] | None = None) -> int:
 
         updated = update.run(say, notify, force=True, check_only=args.check_only)
         return 0
+    if args.cmd == "term":
+        return cmd_term(args)
+    if args.cmd == "run":
+        return cmd_run(args)
+    if args.cmd == "platform":
+        return cmd_platform(args)
     if args.cmd == "daemon":
+        if sys.platform != "darwin":
+            print(DAEMON_NEEDS_MACOS, file=sys.stderr)
+            return 2
         from .daemon import main as daemon_main
         return daemon_main(args)
     print(HELP)

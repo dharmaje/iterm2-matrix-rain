@@ -15,11 +15,8 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
+from .sim import DIGITS, KATAKANA, LATIN, Rain
 from .state import Params
-
-KATAKANA = [chr(c) for c in range(0xFF66, 0xFF9E)]
-DIGITS = list("0123456789")
-LATIN = list("ZTHEMAXRIX:.=*+-<>|")
 
 
 def frame_size(cols: int, rows: int, dcfg: dict) -> tuple[int, int]:
@@ -118,80 +115,39 @@ class SpriteCache:
 
 
 class Renderer:
-    """Holds the rain simulation for one frame size."""
+    """Draws the rain simulation (sim.Rain) for one frame size."""
 
     def __init__(self, width: int, height: int, rcfg: dict, seed: int | None = None,
                  sprites: SpriteCache | None = None):
         self.rcfg = rcfg
         self.rng = random.Random(seed)
         self.sprites = sprites or SpriteCache(rcfg)
-        self.tail_min = int(rcfg.get("tail_min", 8))
-        self.tail_max = int(rcfg.get("tail_max", 26))
         self.gamma = float(rcfg.get("tail_gamma", 1.6))
+        self.rain: Rain | None = None
         self.resize(width, height)
 
     def resize(self, width: int, height: int) -> None:
         self.width, self.height = int(width), int(height)
         cw, ch = self.sprites.cw, self.sprites.ch
-        self.ncols = max(1, self.width // cw)
-        self.nrows = max(1, -(-self.height // ch))
-        self.x0 = (self.width - self.ncols * cw) // 2
-        n = len(self.sprites.glyphs)
-        rng = self.rng
-        self.cells = [[rng.randrange(n) for _ in range(self.nrows)] for _ in range(self.ncols)]
-        self.active = [False] * self.ncols
-        self.head = [0.0] * self.ncols
-        self.length = [self.tail_min] * self.ncols
-        self.factor = [1.0] * self.ncols
-        self._seeded = False
+        ncols = max(1, self.width // cw)
+        nrows = max(1, -(-self.height // ch))
+        self.x0 = (self.width - ncols * cw) // 2
+        if self.rain is None:
+            self.rain = Rain(ncols, nrows, len(self.sprites.glyphs), self.rcfg, self.rng)
+        else:
+            self.rain.resize(ncols, nrows)
 
-    def _spawn(self, c: int, head: float | None = None) -> None:
-        rng = self.rng
-        self.active[c] = True
-        self.length[c] = rng.randint(self.tail_min, self.tail_max)
-        self.factor[c] = rng.uniform(0.6, 1.45)
-        self.head[c] = head if head is not None else -rng.uniform(0.0, 4.0)
+    # The simulation's state, read by draw() and by the daemon and selftest.
+    ncols = property(lambda self: self.rain.ncols)
+    nrows = property(lambda self: self.rain.nrows)
+    cells = property(lambda self: self.rain.cells)
+    active = property(lambda self: self.rain.active)
+    head = property(lambda self: self.rain.head)
+    length = property(lambda self: self.rain.length)
 
     def step(self, dt: float, p: Params) -> None:
         """Advance the simulation by dt seconds at the given parameters."""
-        rng = self.rng
-        dt = max(0.0, min(dt, 1.0))
-        density = min(0.95, max(0.0, p.density))
-        if not self._seeded:
-            # Start mid-flow rather than with an empty screen.
-            for c in range(self.ncols):
-                if rng.random() < density:
-                    self._spawn(c, head=rng.uniform(0, self.nrows + self.tail_max))
-            self._seeded = True
-        avg_len = (self.tail_min + self.tail_max) / 2
-        run_time = (self.nrows + avg_len) / max(0.1, p.speed)
-        if density <= 0.001:
-            rate = 0.0
-        else:
-            mean_wait = max(0.05, run_time * (1 - density) / density)
-            rate = 1.0 / mean_wait
-        spawn_p = 1.0 - math.exp(-rate * dt)
-        n = len(self.sprites.glyphs)
-        mut = max(0.0, p.mutation) * dt
-        for c in range(self.ncols):
-            if self.active[c]:
-                self.head[c] += p.speed * self.factor[c] * dt
-                L = self.length[c]
-                if self.head[c] - L > self.nrows:
-                    self.active[c] = False
-                    continue
-                # Glyph mutation within the visible stretch.
-                expected = mut * L
-                k = int(expected) + (1 if rng.random() < expected - int(expected) else 0)
-                if k:
-                    col = self.cells[c]
-                    top = max(0, int(self.head[c] - L))
-                    bot = min(self.nrows - 1, int(self.head[c]))
-                    if bot >= top:
-                        for _ in range(k):
-                            col[rng.randint(top, bot)] = rng.randrange(n)
-            elif rng.random() < spawn_p:
-                self._spawn(c)
+        self.rain.step(dt, p)
 
     def draw(self, p: Params, tint=None) -> Image.Image:
         """Return an RGB frame for the current simulation state.

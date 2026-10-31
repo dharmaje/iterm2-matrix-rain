@@ -5,13 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "iterm2-matrix-rain"
 version = "0.2.0"
-description = "A soft animated digital rain behind iTerm2 text that reacts to Claude Code hooks."
+description = "A soft animated digital rain behind iTerm2 text, or full-screen in any terminal, that reacts to Claude Code hooks."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Jason Epel" }]
 requires-python = ">=3.10"
 dependencies = [
-  "iterm2>=2.7",
+  "iterm2>=2.7; sys_platform == 'darwin'",
   "Pillow>=10.1",
   "tomli>=2.0; python_version < '3.11'",
 ]

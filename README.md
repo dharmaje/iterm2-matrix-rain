@@ -2,6 +2,8 @@
 
 A Matrix color theme for iTerm2 plus a soft, animated digital rain drawn behind the terminal text.  The rain's tint, tempo and density shift gently with Claude Code events: a prompt submitted, a tool running, Claude waiting for you, a tool failure, a finished turn.
 
+On Linux, and in any terminal other than iTerm2, the same rain runs full-screen as colored text in its own tab, window or tmux pane, and follows the same events.  See [Linux and other terminals](#linux-and-other-terminals).
+
 Project page with mock screenshots and instructions: https://dharmaje.github.io/iterm2-matrix-rain/
 
 ![Four states](docs/showcase-states.png)
@@ -13,6 +15,8 @@ Project page with mock screenshots and instructions: https://dharmaje.github.io/
 
 iTerm2 does not animate GIF backgrounds.  A small daemon renders soft PNG frames with Pillow and swaps each opted-in session's background image through the iTerm2 Python API.  Claude Code hooks send a one-line state event over a Unix socket, and the daemon eases the rain to the new palette over about a second.
 
+Other terminals have no background-image API, so `matrix-rain term` draws the same simulation as glyphs instead, one per cell.  `matrix-rain run` picks for you: the iTerm2 daemon on macOS inside iTerm2, the text rain everywhere else.  `matrix-rain platform` prints what it detected and why.
+
 ## Camera motion (optional, off by default)
 
 With the camera turned on, the rain draws a gold outline around whatever moves in front of the Mac's camera, such as you, and fades back over about five seconds.  The gold is stronger for the first six seconds after you start moving.  It is off until you run `matrix-rain camera enable`, and nothing is recorded or stored.  See [Camera motion](#camera-motion) for details.
@@ -21,12 +25,23 @@ With the camera turned on, the rain draws a gold outline around whatever moves i
 
 ## Requirements
 
+On macOS, for the rain behind iTerm2 text:
+
 - macOS with iTerm2 3.5 or newer
 - Python 3.10 or newer (`python3`)
 - iTerm2's Python API turned on: Settings > General > Magic > Enable Python API
 - `jq` is optional; the hook falls back to `sed`
 
+On Linux, for the text rain (tested on Ubuntu 26.04 in Ptyxis):
+
+- Python 3.10 or newer with its `venv` module (`sudo apt install python3-venv` on Ubuntu and Debian)
+- A terminal with 256 colors; truecolor (`COLORTERM=truecolor`) looks best
+- A font with half-width katakana, such as Noto Sans Mono CJK, or set `[terminal] glyphs = "ascii"`
+- `jq`, `tmux` and `notify-send` are optional
+
 ## Install
+
+This is the macOS and iTerm2 install.  On Linux, see [Linux and other terminals](#linux-and-other-terminals).
 
 ```bash
 git clone https://github.com/dharmaje/iterm2-matrix-rain.git
@@ -73,6 +88,65 @@ To run it by hand instead, from an iTerm2 terminal (iTerm2 may ask once whether 
 .venv/bin/matrix-rain daemon
 ```
 
+## Linux and other terminals
+
+There is no iTerm2 on Linux, so the rain cannot sit behind your text.  Instead `matrix-rain term` fills a terminal with it: run it in a second tab or window, or in a tmux pane beside Claude Code.  It works the same on macOS in Terminal.app or any other terminal, and over SSH.
+
+### Install
+
+```bash
+git clone https://github.com/dharmaje/iterm2-matrix-rain.git
+cd iterm2-matrix-rain
+./install.sh --install            # .venv, dependencies, ~/.local/bin/matrix-rain
+./install.sh --hooks              # prints the Claude Code hook JSON
+```
+
+On Linux the preflight table checks less, since there is no iTerm2 or AppleScript:
+
+```text
+Dependency                     Required     Found          Status
+OS                             any          Ubuntu 26.04   OK
+python3                        3.10+        3.14.4         OK
+python3 venv module            any          yes            OK
+terminal colors (info)         256+         truecolor      OK
+jq (optional)                  any          jq-1.8.1       OK
+tmux (optional)                any          not found      OK (for a split pane)
+notify-send (optional)         any          yes            OK
+~/.local/bin on PATH           optional     yes            OK
+```
+
+Only Python and its `venv` module are required.  `--install` links `~/.local/bin/matrix-rain` to `.venv/bin/matrix-rain`, so the command works from any folder when `~/.local/bin` is on your `PATH` (Ubuntu adds it at login once the folder exists).  It never replaces a file there, or a link to another install (pipx, uv tool); it then prints the full `.venv` path to use instead.  `--autolaunch` and `--camera` print that they are macOS only and change nothing, and `--uninstall` removes the link, the cache folder and `.venv`.
+
+### Run it
+
+```bash
+matrix-rain run                   # in a second terminal tab or window
+matrix-rain term --demo           # cycle through the states, no hooks needed
+matrix-rain platform              # what was detected, and which backend run starts
+```
+
+Press `q` to quit (Ctrl-C and Ctrl-\ work too); the terminal is restored as it was.  Ctrl-S does not freeze it.  Keys `1` to `6` show idle, working, waiting, error, done and off.  The rain resizes with the window.
+
+Inside tmux, `scripts/rain-pane.sh --run` splits the current window and starts the rain in a pane on the right, 30% wide by default (`--run 40%` for more).  The pane follows only the Claude Code events from your tmux client, so Claude in the left pane drives the rain on the right.
+
+### Which events it follows
+
+The Claude Code hooks are the same on both systems.  Each `matrix-rain term` listens on its own socket in `~/.cache/iterm2-matrix-rain/term/`, and every event is sent to all of them as well as to the iTerm2 daemon.  `--follow` (or `[terminal] follow`) picks which ones it reacts to:
+
+| `follow` | Reacts to |
+|---|---|
+| `auto` (default) | Inside tmux, events from the same tmux client.  Outside tmux, every event, because a rain in another tab cannot tell which tab Claude runs in. |
+| `any` | Every event. |
+| `tty:/dev/pts/3` | Only events from that terminal.  Run `tty` in Claude's terminal to find it. |
+
+With several tmux clients attached to one session, `auto` follows the most recently active one; use `tty:` to pin it.
+
+### Colors and glyphs
+
+It uses 24-bit color when `COLORTERM` is `truecolor` or `24bit`, and the 256-color palette otherwise; `[terminal] color` overrides it.  tmux often does not pass `COLORTERM` into panes, so inside tmux it also asks tmux whether the outer terminal has RGB (`#{client_termfeatures}`).  If tmux does not know, add `set -as terminal-features ',*:RGB'` to `~/.tmux.conf`, or set `color = "truecolor"`.  The glyphs are half-width katakana, digits and Latin letters, each one cell wide.  If your font shows boxes, set `glyphs = "ascii"`.
+
+Glyph mirroring and the glow halo are left out, since a terminal cell cannot draw them.  The camera motion tint is macOS only.  The text rain does not update itself; run `matrix-rain update` now and then.
+
 ## Updates
 
 Each time the daemon starts, before it connects to iTerm2, it:
@@ -89,6 +163,8 @@ auto = false          # skip the update step entirely
 ```
 
 ## Shortcut scripts
+
+`scripts/rain-pane.sh` (bash, Linux or macOS) opens the text rain in a tmux split; see [Run it](#run-it).  The others are for macOS and iTerm2 only.
 
 `scripts/` has four zsh helpers you can run directly or alias: `enable-matrix-profile.zsh` and `disable-matrix-profile.zsh` switch the current iTerm2 session to the Matrix profile and back, and `enable-camera.zsh` and `disable-camera.zsh` turn camera motion on or off and restart the daemon.  Each prints help without arguments and acts with `--run`.  Suggested aliases for `~/.zshrc`, with your clone's path:
 
@@ -287,6 +363,18 @@ mirror = true                # move like a mirror image of you
 only_when_active = true      # open the camera only while iTerm2 is frontmost
 device = ""                  # part of a camera's name; empty = default camera
 
+# Text rain for any terminal (`matrix-rain term`, or `matrix-rain run` outside
+# iTerm2 on macOS).  It fills the terminal with colored glyphs, so it runs in
+# its own tab, window or tmux pane rather than behind your text.  The colors,
+# speeds and tail lengths come from [states] and [render] below.
+[terminal]
+fps = 20                  # frames per second
+glyphs = "katakana"       # "katakana" (half-width, one cell each) or "ascii" for fonts without them
+color = "auto"            # "auto", "truecolor" or "256"; auto uses truecolor when COLORTERM says so
+follow = "auto"           # which events to follow: "auto", "any" or "tty:/dev/pts/N" (see README)
+max_cols = 400            # rain columns at most; wider terminals keep the rest blank
+demo_interval = 5.0       # seconds per state with --demo
+
 [render]
 cell_width = 12           # rain glyph cell size in frame pixels
 cell_height = 16
@@ -394,6 +482,16 @@ Measured on an Apple silicon Mac with iTerm2 3.7.6 and a 209x51 window:
 
 Only sessions in the selected tab of the frontmost iTerm2 window animate at full rate, and only while iTerm2 is the active app.  Everything else gets one frame every 2 seconds.  Lower `fps` in the config to trade smoothness for CPU.
 
+The text rain, measured on Ubuntu 26.04 with `matrix-rain bench --term --cols 200 --rows 50` (state working):
+
+| Measure | Value |
+|---|---|
+| Simulation step plus escape-code encode, per frame | about 1.3 ms |
+| Bytes written per frame, truecolor | about 17 KB (the first full frame about 25 KB) |
+| Bytes written per frame, 256 colors | about 14 KB |
+
+Only cells that changed are redrawn.  Lower `[terminal] fps` (20 by default) over a slow SSH link.
+
 ## Troubleshooting
 
 - **Nothing animates.**  Check the session's profile is named `Matrix` (or start the daemon with `--session <id>`), the Python API is on, and the daemon is running: `pgrep -fl matrix_rain`.  The AutoLaunch daemon logs to `~/Library/Logs/iterm2-matrix-rain.log`; a line saying it could not connect within 15 s means it was started outside iTerm2 without a cookie.
@@ -406,6 +504,10 @@ Only sessions in the selected tab of the frontmost iTerm2 window animate at full
 - **The camera light stays off after `camera enable`.**  Restart the daemon, then check the log for `camera: opened`.  `camera: packages not installed` means you need `./install.sh --camera`, and `camera: unavailable (camera access is denied ...)` means you need to allow access in System Settings > Privacy & Security > Camera.  With `only_when_active = true`, the camera opens only while iTerm2 is frontmost.
 - **The gold appears everywhere or never.**  Lower or raise `sensitivity`.  Light flicker and auto-exposure can register as motion at high sensitivity.
 - **Stop it and clean up.**  Stop the daemon with `kill <pid>`; it restores each session's background on SIGTERM.  `./install.sh --uninstall` removes everything it installed.
+- **Linux: `matrix-rain: command not found`.**  `~/.local/bin` is not on your `PATH` yet.  Log out and back in, add it in `~/.profile`, or run `.venv/bin/matrix-rain` from the clone.
+- **Linux: the glyphs show as boxes or misalign.**  The font has no half-width katakana.  Install Noto Sans CJK (`sudo apt install fonts-noto-cjk`) or set `[terminal] glyphs = "ascii"`.
+- **Linux: the text rain does not react to Claude Code.**  Check the hooks are merged, then run `matrix-rain event waiting -v` from another tab; the rain should turn amber within a second.  Inside tmux with `follow = "auto"`, only events from the same tmux client count, so run Claude Code in that tmux client, or use `--follow any`.
+- **Linux: `matrix-rain daemon` says it needs macOS.**  The daemon drives iTerm2.  Use `matrix-rain run` or `matrix-rain term`.
 
 ## Self-test
 
@@ -413,7 +515,7 @@ Only sessions in the selected tab of the frontmost iTerm2 window animate at full
 .venv/bin/matrix-rain selftest
 ```
 
-Checks frame sizes and softness, state interpolation, the hook's event mapping with both `jq` and `sed`, iTerm2 version comparison, the update decision (with throwaway git repositories) and the installer's version comparison and preflight (with a stubbed `defaults`), and the camera motion mask, heat timing, tint bounds, config writes and the byte-identical camera-off frame (with a synthetic source).  None of it needs iTerm2 or a camera.
+Checks frame sizes and softness, state interpolation, the hook's event mapping with both `jq` and `sed`, iTerm2 version comparison, the update decision (with throwaway git repositories) and the installer's version comparison and preflight (with a stubbed `defaults`), and the camera motion mask, heat timing, tint bounds, config writes and the byte-identical camera-off frame (with a synthetic source).  None of it needs iTerm2 or a camera.  It passes on Linux too: checks that need macOS print `SKIP` with the reason, and the installer's macOS preflight runs with stubbed tools.
 
 ## License
 

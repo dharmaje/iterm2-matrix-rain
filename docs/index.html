@@ -135,7 +135,7 @@
       </button>
       <a class="btn secondary" href="https://github.com/dharmaje/iterm2-matrix-rain">View on GitHub</a>
     </div>
-    <p class="reqs">Free · MIT license · macOS · iTerm2 3.5+ · Python 3.10+</p>
+    <p class="reqs">Free · MIT license · macOS · iTerm2 3.5+ · Python 3.10+ · Linux: text rain in any terminal</p>
 
     <section class="showcase" aria-label="iterm2-matrix-rain states">
       <img src="showcase-states.png" width="1820" height="1000"
@@ -174,6 +174,17 @@ cd iterm2-matrix-rain
         The installer checks macOS, iTerm2 and Python first and prints a table.  It asks before
         upgrading a package.  If a minimum is missing, it stops and writes nothing.
       </p>
+    </div>
+
+    <div class="card">
+      <h2>On Linux and other terminals</h2>
+      <p class="note" style="margin: 0 0 12px;">
+        Without iTerm2 there is no background image, so the rain runs full-screen as colored text in its own
+        tab, window or tmux pane, and follows the same Claude Code hooks.  Tested on Ubuntu with Ptyxis.
+      </p>
+      <pre class="cmd"><code>./install.sh --install            # python3 and its venv module; links ~/.local/bin/matrix-rain
+matrix-rain run                   # in a second tab; q quits, 1-6 show each state
+scripts/rain-pane.sh --run        # or in a tmux split beside Claude Code</code></pre>
     </div>
 
     <div class="card">
