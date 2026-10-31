@@ -1,11 +1,13 @@
-"""iTerm2 version checks and macOS notifications."""
+"""iTerm2 version checks and desktop notifications (macOS or Linux)."""
 
 from __future__ import annotations
 
 import os
 import plistlib
 import re
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from . import BUILT_FOR_ITERM2, MIN_ITERM2, config
@@ -44,13 +46,22 @@ def compare(installed: str | None, built: str = BUILT_FOR_ITERM2,
 
 
 def notify(message: str, title: str = "iterm2-matrix-rain") -> bool:
-    """Post one macOS notification.  Never raises."""
+    """Post one desktop notification: osascript on macOS, notify-send elsewhere.
+
+    False when there is no way to notify (no notify-send) or it failed.  Never raises.
+    """
     def q(s: str) -> str:
         return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
     try:
-        r = subprocess.run(["/usr/bin/osascript", "-e",
-                            f"display notification {q(message)} with title {q(title)}"],
-                           capture_output=True, timeout=10)
+        if sys.platform == "darwin":
+            cmd = ["/usr/bin/osascript", "-e",
+                   f"display notification {q(message)} with title {q(title)}"]
+        else:
+            tool = shutil.which("notify-send")
+            if not tool:
+                return False
+            cmd = [tool, f"--app-name={title}", "--", title, message]
+        r = subprocess.run(cmd, capture_output=True, timeout=10)
         return r.returncode == 0
     except Exception:
         return False

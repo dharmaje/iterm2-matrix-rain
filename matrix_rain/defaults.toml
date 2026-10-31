@@ -56,6 +56,18 @@ mirror = true                # move like a mirror image of you
 only_when_active = true      # open the camera only while iTerm2 is frontmost
 device = ""                  # part of a camera's name; empty = default camera
 
+# Text rain for any terminal (`matrix-rain term`, or `matrix-rain run` outside
+# iTerm2 on macOS).  It fills the terminal with colored glyphs, so it runs in
+# its own tab, window or tmux pane rather than behind your text.  The colors,
+# speeds and tail lengths come from [states] and [render] below.
+[terminal]
+fps = 20                  # frames per second
+glyphs = "katakana"       # "katakana" (half-width, one cell each) or "ascii" for fonts without them
+color = "auto"            # "auto", "truecolor" or "256"; auto uses truecolor when COLORTERM says so
+follow = "auto"           # which events to follow: "auto", "any" or "tty:/dev/pts/N" (see README)
+max_cols = 400            # rain columns at most; wider terminals keep the rest blank
+demo_interval = 5.0       # seconds per state with --demo
+
 [render]
 cell_width = 12           # rain glyph cell size in frame pixels
 cell_height = 16
