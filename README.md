@@ -101,6 +101,15 @@ alias matrix-camera-off='~/iterm2-matrix-rain/scripts/disable-camera.zsh --run'
 
 See [scripts/README.md](scripts/README.md) for what each script does.
 
+## Pausing the rain
+
+Click **Matrix rain** in the status bar (`▶ rain on`) to pause the rain in every Matrix session; it shows `❚❚ rain paused`, and a second click starts it again.  Pausing clears the animated background and keeps the Matrix colors, stops rendering, and closes the camera if it was on.  From a shell, `.venv/bin/matrix-rain pause`, `resume` or `toggle` do the same.  The choice is saved as `[daemon] paused` in `config.toml`, so a paused rain stays paused after a restart until you resume it.  Suggested aliases:
+
+```zsh
+alias matrix-pause='~/iterm2-matrix-rain/.venv/bin/matrix-rain pause'
+alias matrix-resume='~/iterm2-matrix-rain/.venv/bin/matrix-rain resume'
+```
+
 ## Editing the Matrix profile in iTerm2 Settings
 
 The Matrix profile is a Dynamic Profile: iTerm2 loads it from `~/Library/Application Support/iTerm2/DynamicProfiles/iterm2-matrix-rain.json`.  It ships marked **rewritable**, so changes you make in Settings > Profiles > Matrix, such as adding a battery item to the status bar, are saved into that file.  Without that mark, iTerm2 shows a "Changes Will Be Lost" dialog on every edit and throws the change away.
@@ -109,7 +118,7 @@ The Matrix profile is a Dynamic Profile: iTerm2 loads it from `~/Library/Applica
 
 - Your edits live in the installed file only, not in this repo.  `./install.sh --install` replaces the file with the repo's version; it saves your edited copy first to `~/.cache/iterm2-matrix-rain/profile-backups/`.
 - iTerm2 rewrites the whole file when it saves and may reorder its keys.  That is expected.
-- Keep the profile's name `Matrix` (the rain animates sessions by profile name) and its status bar item **Matrix rain camera** if you use the camera toggle.
+- Keep the profile's name `Matrix` (the rain animates sessions by profile name) and its status bar items **Matrix rain** and **Matrix rain camera** if you use the pause and camera toggles.
 - Never copy the file into the same `DynamicProfiles` folder under another name.  Two profiles with the same Guid clash.
 
 **If a change breaks it**
@@ -178,7 +187,7 @@ Send a state by hand:
 
 **Permission.**  macOS asks once for camera access the first time the camera opens.  When the AutoLaunch script starts the daemon, the request is in iTerm2's name.  When you run `matrix-rain daemon` or `matrix-rain camera test` by hand in a terminal, it is in the name of that terminal app or Python.  Change it later in System Settings > Privacy & Security > Camera.
 
-**A status bar toggle.**  While the daemon runs, it registers a status bar component named **Matrix rain camera** that shows `◉ camera on` or `○ camera off`.  Click it to switch the camera on or off at once.  The setting is saved to `config.toml`, so it holds after a restart.  The Matrix profile turns the status bar on with the current directory, git state and this toggle, so there is nothing to add by hand.  The toggle shows its text while the daemon runs.  If a session already used the Matrix profile before you updated it, re-apply the profile to turn the bar on: Session > Edit Session, or `it2 profile apply Matrix --session <id>`.  Whether the bar sits at the top or bottom is a global iTerm2 setting: Settings > Appearance > General > Status bar location.
+**A status bar toggle.**  While the daemon runs, it registers a status bar component named **Matrix rain camera** that shows `◉ camera on` or `○ camera off`.  Click it to switch the camera on or off at once.  The setting is saved to `config.toml`, so it holds after a restart.  The Matrix profile turns the status bar on with the current directory, the **Matrix rain** pause toggle, this one, and CPU, memory, network and battery meters, so there is nothing to add by hand.  The toggle shows its text while the daemon runs.  If a session already used the Matrix profile before you updated it, re-apply the profile to turn the bar on: Session > Edit Session, or `it2 profile apply Matrix --session <id>`.  Whether the bar sits at the top or bottom is a global iTerm2 setting: Settings > Appearance > General > Status bar location.
 
 **Turn it on:**
 
@@ -405,7 +414,7 @@ Only sessions in the selected tab of the frontmost iTerm2 window animate at full
 - **A notification says iTerm2 is newer than the version this was built for.**  Usually harmless.  If the rain misbehaves, run `matrix-rain update` or check the repository for a newer release.
 - **The camera light stays off after `camera enable`.**  Restart the daemon, then check the log for `camera: opened`.  `camera: packages not installed` means you need `./install.sh --camera`, and `camera: unavailable (camera access is denied ...)` means you need to allow access in System Settings > Privacy & Security > Camera.  With `only_when_active = true`, the camera opens only while iTerm2 is frontmost.
 - **The gold appears everywhere or never.**  Lower or raise `sensitivity`.  Light flicker and auto-exposure can register as motion at high sensitivity.
-- **Stop it and clean up.**  Stop the daemon with `kill <pid>`; it restores each session's background on SIGTERM.  `./install.sh --uninstall` removes everything it installed.
+- **Stop it and clean up.**  For a break, click **Matrix rain** in the status bar or run `matrix-rain pause` (see Pausing the rain).  To stop the daemon, `kill <pid>`; it restores each session's background on SIGTERM.  `./install.sh --uninstall` removes everything it installed.
 
 ## Self-test
 

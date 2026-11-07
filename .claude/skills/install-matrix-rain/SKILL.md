@@ -21,4 +21,4 @@ description: Install iterm2-matrix-rain for the user. Use when asked to install,
    - `.venv/bin/matrix-rain event waiting -v` reports `delivered=True`, and the log shows `<id> waiting`.
    - Read the profile back through the Python API (`session.async_get_profile()`) to confirm the name is Matrix and a frame path is set.
 
-To stop it, `kill` the daemon pid; it restores the background on SIGTERM.
+To pause it for a break, click **Matrix rain** in the status bar or run `.venv/bin/matrix-rain pause`.  To stop it, `kill` the daemon pid; it restores the background on SIGTERM.
