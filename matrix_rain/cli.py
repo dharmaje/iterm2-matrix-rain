@@ -24,6 +24,9 @@ Commands:
   bench      Measure render and PNG encode time per frame.
   selftest   Run the built-in checks (no iTerm2 needed).
   camera     Optional camera motion tint: enable, disable, status, test.
+  pause      Pause the rain in every Matrix session (backgrounds cleared, camera closed).
+  resume     Start the rain again.
+  toggle     Pause if running, resume if paused.
   update     Fast-forward this clone from origin now (clean clone only), then exit.
   version    Print this project's version, the iTerm2 version it was built for,
              and the installed iTerm2 version.
@@ -40,9 +43,11 @@ Examples:
   matrix-rain bench --motion
   matrix-rain camera enable
   matrix-rain camera test
+  matrix-rain pause
+  matrix-rain resume
   matrix-rain update
   matrix-rain version
-  matrix-rain status-component     # the camera toggle entry for the profile's status bar
+  matrix-rain status-component     # the toggle entries for the profile's status bar
 
 Run "matrix-rain <command> -h" for a command's options.
 """
@@ -125,6 +130,23 @@ def send_event(state: str, tty: str | None, session: str | None) -> bool:
         return True
     except OSError:
         return False
+
+
+def cmd_pause(action: str) -> int:
+    """Send pause, resume or toggle to the running daemon."""
+    from .config import SOCKET_PATH
+
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        try:
+            s.sendto(json.dumps({"cmd": action}).encode(), str(SOCKET_PATH))
+        finally:
+            s.close()
+    except OSError:
+        print(f"The daemon is not running (no socket at {SOCKET_PATH}); nothing to {action}.", file=sys.stderr)
+        return 1
+    print(f"Sent {action} to the daemon; the \"Matrix rain\" status bar item shows the result.")
+    return 0
 
 
 def cmd_event(args) -> int:
@@ -390,7 +412,10 @@ def build_parser() -> argparse.ArgumentParser:
     u = sub.add_parser("update", help="fast-forward this clone from origin now")
     u.add_argument("--check-only", action="store_true", help="only report whether an update is available")
     sub.add_parser("version", help="print versions")
-    sub.add_parser("status-component", help="print the camera toggle's Status Bar Layout entry for profiles/Matrix.json")
+    sub.add_parser("pause", help="pause the rain in every Matrix session")
+    sub.add_parser("resume", help="start the rain again")
+    sub.add_parser("toggle", help="pause or resume the rain")
+    sub.add_parser("status-component", help="print the toggles' Status Bar Layout entries for profiles/Matrix.json")
     return ap
 
 
@@ -418,11 +443,13 @@ def main(argv: list[str] | None = None) -> int:
         return selftest_main()
     if args.cmd == "camera":
         return cmd_camera(args)
+    if args.cmd in ("pause", "resume", "toggle"):
+        return cmd_pause(args.cmd)
     if args.cmd == "status-component":
         import json
 
-        from .statusbar import layout_entry
-        print(json.dumps(layout_entry(), indent=2, ensure_ascii=False))
+        from .statusbar import SPECS, layout_entry
+        print(json.dumps([layout_entry(spec=spec) for spec in SPECS], indent=2, ensure_ascii=False))
         return 0
     if args.cmd == "version":
         from . import BUILT_FOR_ITERM2, __version__

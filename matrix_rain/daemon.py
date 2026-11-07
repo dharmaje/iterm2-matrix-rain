@@ -137,6 +137,8 @@ class Daemon:
         self.warned_missing: set[str] = set()
         self.motion_demo = motion_demo
         self.status_component = None
+        self.status_components: list = []
+        self.paused = bool(self.d.get("paused", False))
         self.motion = self._make_motion(motion_demo or self._camera_setting())
 
     def _camera_setting(self) -> bool:
@@ -206,44 +208,97 @@ class Daemon:
     async def toggle_camera(self, why: str = "") -> bool:
         return await self.set_camera(self.motion is None, why)
 
+    # ------------------------------------------------------------ pause toggle
+    def pause_text(self) -> str:
+        return "❚❚ rain paused" if self.paused else "▶ rain on"
+
+    async def set_paused(self, paused: bool, why: str = "") -> bool:
+        """Pause or resume the rain in every Matrix session and save `[daemon] paused`.
+
+        Pausing clears each session's background (the Matrix colors stay),
+        stops rendering and closes the camera; resuming draws again at once.
+        """
+        loop = asyncio.get_running_loop()
+        if paused != self.paused:
+            self.paused = paused
+            if paused:
+                for a in list(self.sessions.values()):
+                    if self.app is not None:
+                        try:
+                            await asyncio.wait_for(self.restore(a), timeout=3)
+                        except Exception as exc:  # noqa: BLE001
+                            log(f"restore timed out for {a.sid}: {exc}")
+                    a.initialized = False
+            else:
+                for a in self.sessions.values():
+                    a.last_frame = 0.0
+                    a.last_step = time.monotonic()
+        self.d["paused"] = paused
+        try:
+            path = await loop.run_in_executor(None, lambda: config.set_key("daemon", "paused", paused))
+            saved = f"saved to {path}"
+        except Exception as exc:  # noqa: BLE001
+            saved = f"not saved ({exc})"
+        log(f"rain: {'paused' if paused else 'resumed'}{' from ' + why if why else ''}; {saved}")
+        self.motion_wake.set()
+        self.wake.set()
+        await self.refresh_status()
+        return self.paused
+
+    async def toggle_paused(self, why: str = "") -> bool:
+        return await self.set_paused(not self.paused, why)
+
     async def refresh_status(self) -> None:
         """Make iTerm2 re-evaluate the status bar text in animated sessions."""
-        if self.app is None or self.status_component is None:
+        if self.app is None or not self.status_components:
             return
-        value = self.status_text()
+        values = {"user.matrixRainCamera": self.status_text(), "user.matrixRainPaused": self.pause_text()}
         for a in list(self.sessions.values()):
             s = self.app.get_session_by_id(a.sid)
             if s is None:
                 continue
-            try:
-                await asyncio.wait_for(s.async_set_variable("user.matrixRainCamera", value), timeout=3)
-            except Exception as exc:  # noqa: BLE001
-                if self.verbose:
-                    log(f"status refresh failed for {a.sid}: {exc}")
+            for name, value in values.items():
+                try:
+                    await asyncio.wait_for(s.async_set_variable(name, value), timeout=3)
+                except Exception as exc:  # noqa: BLE001
+                    if self.verbose:
+                        log(f"status refresh failed for {a.sid}: {exc}")
 
     async def register_status_bar(self) -> None:
-        """Register the clickable "Matrix rain camera" status bar component."""
+        """Register the clickable "Matrix rain" and "Matrix rain camera" status bar components."""
         import iterm2
 
         daemon = self
-        from .statusbar import build_component
+        from .statusbar import CAMERA, RAIN, build_component
 
-        component = build_component()
-
+        # iTerm2 binds RPC arguments by the coroutine's own parameter names, so
+        # each component needs its own function, named as in statusbar.py.
         @iterm2.StatusBarRPC
         async def matrix_rain_camera_status(knobs, camera=iterm2.Reference("user.matrixRainCamera?")):
             return daemon.status_text()
 
-        async def on_click(session_id):
+        @iterm2.StatusBarRPC
+        async def matrix_rain_pause_status(knobs, paused=iterm2.Reference("user.matrixRainPaused?")):
+            return daemon.pause_text()
+
+        async def on_camera_click(session_id):
             await daemon.toggle_camera(f"the status bar ({session_id[:8]})")
 
-        try:
-            await asyncio.wait_for(component.async_register(self.conn, matrix_rain_camera_status, onclick=on_click),
-                                   timeout=10)
-            self.status_component = component
-            log("status bar: registered \"Matrix rain camera\" (us.epel.iterm2-matrix-rain.camera)")
-        except Exception as exc:  # noqa: BLE001
-            log(f"status bar: not registered ({exc.__class__.__name__}: {exc}); running without it")
+        async def on_pause_click(session_id):
+            await daemon.toggle_paused(f"the status bar ({session_id[:8]})")
+
+        for spec, rpc, click in ((CAMERA, matrix_rain_camera_status, on_camera_click),
+                                 (RAIN, matrix_rain_pause_status, on_pause_click)):
+            component = build_component(spec)
+            try:
+                await asyncio.wait_for(component.async_register(self.conn, rpc, onclick=click), timeout=10)
+                self.status_components.append(component)
+                if spec is CAMERA:
+                    self.status_component = component
+                log(f"status bar: registered \"{spec.short}\" ({spec.identifier})")
+            except Exception as exc:  # noqa: BLE001
+                log(f"status bar: \"{spec.short}\" not registered ({exc.__class__.__name__}: {exc}); "
+                    "running without it")
 
     async def motion_loop(self) -> None:
         """Open the source only while wanted, and feed frames into the mask."""
@@ -263,7 +318,7 @@ class Daemon:
                 fast = any(self.focused(a.sid) for a in self.sessions.values())
                 # The synthetic demo never touches the camera, so it ignores only_when_active.
                 gate = m.settings.only_when_active and m.source.name != "synthetic"
-                want = bool(self.sessions) and (fast or not gate) and not m.failed
+                want = bool(self.sessions) and (fast or not gate) and not m.failed and not self.paused
                 if want and not m.is_open:
                     try:
                         await loop.run_in_executor(None, m.open)
@@ -430,6 +485,11 @@ class Daemon:
                 return
             try:
                 msg = json.loads(data.decode())
+                cmd = msg.get("cmd")
+                if cmd in ("pause", "resume", "toggle"):
+                    want = {"pause": True, "resume": False}.get(cmd, not self.paused)
+                    asyncio.get_running_loop().create_task(self.set_paused(want, "the command line"))
+                    continue
                 self.apply(msg.get("state"), msg.get("tty"), msg.get("session"))
             except Exception as exc:
                 log(f"bad event: {exc}")
@@ -469,6 +529,13 @@ class Daemon:
         fast = 1.0 / fps
         slow = max(fast, float(self.d.get("idle_interval", 2.0)))
         while not self.stop.is_set():
+            if self.paused:
+                self.wake.clear()
+                try:
+                    await asyncio.wait_for(self.wake.wait(), timeout=slow)
+                except asyncio.TimeoutError:
+                    pass
+                continue
             now = time.monotonic()
             next_due = now + slow
             for a in list(self.sessions.values()):

@@ -514,19 +514,58 @@ def test_camera(cfg) -> bool:
 
 
 def test_profile_component() -> bool:
-    """The camera toggle baked into profiles/Matrix.json matches the daemon's component."""
+    """The toggles baked into profiles/Matrix.json match the daemon's components."""
     import json
     from pathlib import Path
 
-    from .statusbar import CLASS, REQUEST_KEY, registration_b64
+    from .statusbar import REQUEST_KEY, SPECS, registration_b64
 
     prof = json.loads((Path(__file__).resolve().parent.parent / "profiles" / "Matrix.json").read_text())
     comps = prof["Profiles"][0]["Status Bar Layout"]["components"]
-    entry = next((c for c in comps if c.get("class") == CLASS), None)
-    ok = check("profile carries the camera toggle", entry is not None)
-    if entry:
-        ok &= check("profile toggle matches the daemon's registration (run matrix-rain status-component if not)",
-                    entry["configuration"].get(REQUEST_KEY) == registration_b64())
+    saved = {c.get("configuration", {}).get(REQUEST_KEY) for c in comps}
+    ok = True
+    for spec in SPECS:
+        ok &= check(f"profile carries \"{spec.short}\" matching the daemon's registration "
+                    "(run matrix-rain status-component if not)", registration_b64(spec) in saved)
+    return ok
+
+
+def test_pause(cfg) -> bool:
+    """The pause toggle, with no iTerm2: state, saved config, render loop and camera gate."""
+    import asyncio
+    import copy
+    import tempfile
+
+    from . import daemon as dmod
+
+    with tempfile.TemporaryDirectory() as tmp:
+        saved, saved_log = config.CONFIG_PATH, dmod.log
+        dmod.log = lambda msg: None
+        config.CONFIG_PATH = Path(tmp) / "config.toml"
+        config.CONFIG_PATH.write_text("# mine\n[daemon]\nfps = 5\n")
+        try:
+            async def run():
+                d = dmod.Daemon(None, copy.deepcopy(cfg), [])
+                checks = [("pause: running at start", not d.paused and d.pause_text() == "▶ rain on")]
+                await d.toggle_paused("selftest")
+                data = config.tomllib.loads(config.CONFIG_PATH.read_text())
+                checks.append(("pause: state, text and config flip",
+                               d.paused and d.pause_text() == "❚❚ rain paused"
+                               and data["daemon"]["paused"] is True and data["daemon"]["fps"] == 5))
+                checks.append(("pause: comment kept", config.CONFIG_PATH.read_text().startswith("# mine")))
+                d2 = dmod.Daemon(None, dmod.config.load(), [])
+                checks.append(("pause: a restarted daemon starts paused", d2.paused))
+                await d.toggle_paused("selftest")
+                data = config.tomllib.loads(config.CONFIG_PATH.read_text())
+                checks.append(("resume: state and config flip back", not d.paused and data["daemon"]["paused"] is False))
+                return checks
+
+            results = asyncio.run(run())
+        finally:
+            config.CONFIG_PATH, dmod.log = saved, saved_log
+    ok = True
+    for name, cond in results:
+        ok &= check(name, cond)
     return ok
 
 
@@ -587,7 +626,7 @@ def _dilation_ok() -> bool:
 
 def main() -> int:
     cfg = config.load(Path("/nonexistent"))
-    results = [test_renderer(cfg), test_state(cfg), test_hook(), test_versions(), test_update(), test_installer(), test_camera(cfg), test_toggle(cfg), test_profile_component()]
+    results = [test_renderer(cfg), test_state(cfg), test_hook(), test_versions(), test_update(), test_installer(), test_camera(cfg), test_toggle(cfg), test_pause(cfg), test_profile_component()]
     ok = all(results)
     print("all checks passed" if ok else "some checks FAILED")
     return 0 if ok else 1

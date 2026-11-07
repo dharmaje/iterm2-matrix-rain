@@ -212,55 +212,45 @@
             "Blue Component": 0.149,
             "Alpha Component": 1,
             "Color Space": "sRGB"
-          }
+          },
+          "draw separator between status bar and terminal": true
         },
         "components": [
           {
             "class": "iTermStatusBarWorkingDirectoryComponent",
             "configuration": {
               "knobs": {
+                "path": "path",
                 "base: priority": 5,
                 "base: compression resistance": 1,
                 "shared text color": {
-                  "Red Component": 0.4863,
-                  "Green Component": 0.9412,
-                  "Blue Component": 0.6196,
+                  "Red Component": 0.8600031733512878,
+                  "Color Space": "P3",
+                  "Blue Component": 0.6359096169471741,
                   "Alpha Component": 1,
-                  "Color Space": "sRGB"
+                  "Green Component": 0.6414334774017334
                 }
-              }
-            }
-          },
-          {
-            "class": "iTermStatusBarGitComponent",
-            "configuration": {
-              "knobs": {
-                "base: priority": 4,
-                "base: compression resistance": 1,
-                "shared text color": {
-                  "Red Component": 0.3098,
-                  "Green Component": 0.6588,
-                  "Blue Component": 0.4157,
+              },
+              "layout advanced configuration dictionary value": {
+                "draw separator between status bar and terminal": true,
+                "default text color": {
+                  "Red Component": 0.6016838550567627,
+                  "Color Space": "P3",
+                  "Blue Component": 0.648277997970581,
                   "Alpha Component": 1,
-                  "Color Space": "sRGB"
-                }
-              }
-            }
-          },
-          {
-            "class": "iTermStatusBarRPCProvidedTextComponent",
-            "configuration": {
-              "registration request v2": "ChltYXRyaXhfcmFpbl9jYW1lcmFfc3RhdHVzEgcKBWtub2JzEggKBmNhbWVyYSIgCgZjYW1lcmESFnVzZXIubWF0cml4UmFpbkNhbWVyYT8oA0KjAQoSTWF0cml4IHJhaW4gY2FtZXJhEllTaG93cyB3aGV0aGVyIGl0ZXJtMi1tYXRyaXgtcmFpbidzIGNhbWVyYSBtb3Rpb24gdGludCBpcyBvbi4gIENsaWNrIHRvIHR1cm4gaXQgb24gb3Igb2ZmLiIN4peJIGNhbWVyYSBvbjIhdXMuZXBlbC5pdGVybTItbWF0cml4LXJhaW4uY2FtZXJhQAA=",
-              "knobs": {
-                "base: priority": 5,
-                "base: compression resistance": 1,
-                "shared text color": {
-                  "Red Component": 0.4863,
-                  "Green Component": 0.9412,
-                  "Blue Component": 0.6196,
+                  "Green Component": 0.9305252432823181
+                },
+                "remove empty components": false,
+                "algorithm": 0,
+                "background color": {
+                  "Red Component": 0.01528024859726429,
+                  "Color Space": "P3",
+                  "Blue Component": 0.020320845767855644,
                   "Alpha Component": 1,
-                  "Color Space": "sRGB"
-                }
+                  "Green Component": 0.03074910305440426
+                },
+                "auto-rainbow style": 0,
+                "font": "Menlo-Regular 12"
               }
             }
           },
@@ -268,15 +258,319 @@
             "class": "iTermStatusBarSpringComponent",
             "configuration": {
               "knobs": {
-                "base: priority": 1,
+                "iTermStatusBarSpringComponentSizeMultipleKey": 1,
+                "base: priority": 5,
                 "base: compression resistance": 1,
                 "shared text color": {
-                  "Red Component": 0.4863,
-                  "Green Component": 0.9412,
-                  "Blue Component": 0.6196,
+                  "Red Component": 0.8855677247047424,
+                  "Color Space": "P3",
+                  "Blue Component": 0.6514100432395935,
                   "Alpha Component": 1,
-                  "Color Space": "sRGB"
+                  "Green Component": 0.8173173069953918
+                },
+                "iTermStatusBarSpringComponentSpringConstantKey": 0.01
+              },
+              "layout advanced configuration dictionary value": {
+                "draw separator between status bar and terminal": true,
+                "default text color": {
+                  "Red Component": 0.6016838550567627,
+                  "Color Space": "P3",
+                  "Blue Component": 0.648277997970581,
+                  "Alpha Component": 1,
+                  "Green Component": 0.9305252432823181
+                },
+                "remove empty components": false,
+                "algorithm": 0,
+                "background color": {
+                  "Red Component": 0.01528024859726429,
+                  "Color Space": "P3",
+                  "Blue Component": 0.020320845767855644,
+                  "Alpha Component": 1,
+                  "Green Component": 0.03074910305440426
+                },
+                "auto-rainbow style": 0,
+                "font": "Menlo-Regular 12"
+              }
+            }
+          },
+          {
+            "class": "iTermStatusBarRPCProvidedTextComponent",
+            "configuration": {
+              "registration request v2": "ChhtYXRyaXhfcmFpbl9wYXVzZV9zdGF0dXMSBwoFa25vYnMSCAoGcGF1c2VkIiAKBnBhdXNlZBIWdXNlci5tYXRyaXhSYWluUGF1c2VkPygDQpsBCgtNYXRyaXggcmFpbhJcU2hvd3Mgd2hldGhlciBpdGVybTItbWF0cml4LXJhaW4gaXMgYW5pbWF0aW5nIG9yIHBhdXNlZC4gIENsaWNrIHRvIHBhdXNlIG9yIHJlc3VtZSB0aGUgcmFpbi4iC+KWtiByYWluIG9uMh91cy5lcGVsLml0ZXJtMi1tYXRyaXgtcmFpbi5yYWluQAA=",
+              "knobs": {
+                "base: priority": 5,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.8200916051864624,
+                  "Color Space": "P3",
+                  "Blue Component": 0.6578606367111206,
+                  "Alpha Component": 1,
+                  "Green Component": 0.8969565033912659
                 }
+              }
+            }
+          },
+          {
+            "class": "iTermStatusBarRPCProvidedTextComponent",
+            "configuration": {
+              "knobs": {
+                "base: priority": 5,
+                "shared text color": {
+                  "Red Component": 0.8200916051864624,
+                  "Color Space": "P3",
+                  "Blue Component": 0.6578606367111206,
+                  "Alpha Component": 1,
+                  "Green Component": 0.8969565033912659
+                },
+                "base: compression resistance": 1
+              },
+              "layout advanced configuration dictionary value": {
+                "draw separator between status bar and terminal": true,
+                "default text color": {
+                  "Red Component": 0.6016838550567627,
+                  "Color Space": "P3",
+                  "Blue Component": 0.648277997970581,
+                  "Alpha Component": 1,
+                  "Green Component": 0.9305252432823181
+                },
+                "remove empty components": false,
+                "algorithm": 0,
+                "background color": {
+                  "Red Component": 0.01528024859726429,
+                  "Color Space": "P3",
+                  "Blue Component": 0.020320845767855644,
+                  "Alpha Component": 1,
+                  "Green Component": 0.03074910305440426
+                },
+                "auto-rainbow style": 0,
+                "font": "Menlo-Regular 12"
+              },
+              "registration request v2": "ChltYXRyaXhfcmFpbl9jYW1lcmFfc3RhdHVzEgcKBWtub2JzEggKBmNhbWVyYSIgCgZjYW1lcmESFnVzZXIubWF0cml4UmFpbkNhbWVyYT8oA0KjAQoSTWF0cml4IHJhaW4gY2FtZXJhEllTaG93cyB3aGV0aGVyIGl0ZXJtMi1tYXRyaXgtcmFpbidzIGNhbWVyYSBtb3Rpb24gdGludCBpcyBvbi4gIENsaWNrIHRvIHR1cm4gaXQgb24gb3Igb2ZmLiIN4peJIGNhbWVyYSBvbjIhdXMuZXBlbC5pdGVybTItbWF0cml4LXJhaW4uY2FtZXJhQAA="
+            }
+          },
+          {
+            "class": "iTermStatusBarSpringComponent",
+            "configuration": {
+              "knobs": {
+                "iTermStatusBarSpringComponentSizeMultipleKey": 1,
+                "base: priority": 5,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.6883127093315125,
+                  "Color Space": "P3",
+                  "Blue Component": 0.6657196879386902,
+                  "Alpha Component": 1,
+                  "Green Component": 0.8927004933357239
+                },
+                "iTermStatusBarSpringComponentSpringConstantKey": 0.01
+              },
+              "layout advanced configuration dictionary value": {
+                "draw separator between status bar and terminal": true,
+                "default text color": {
+                  "Red Component": 0.6016838550567627,
+                  "Color Space": "P3",
+                  "Blue Component": 0.648277997970581,
+                  "Alpha Component": 1,
+                  "Green Component": 0.9305252432823181
+                },
+                "remove empty components": false,
+                "algorithm": 0,
+                "background color": {
+                  "Red Component": 0.01528024859726429,
+                  "Color Space": "P3",
+                  "Blue Component": 0.020320845767855644,
+                  "Alpha Component": 1,
+                  "Green Component": 0.03074910305440426
+                },
+                "auto-rainbow style": 0,
+                "font": "Menlo-Regular 12"
+              }
+            }
+          },
+          {
+            "class": "iTermStatusBarFixedSpacerComponent",
+            "configuration": {
+              "knobs": {
+                "base: priority": 5,
+                "iTermStatusBarFixedSpacerComponentWidthKnob": 5,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.6883160471916199,
+                  "Color Space": "P3",
+                  "Blue Component": 0.8298235535621643,
+                  "Alpha Component": 1,
+                  "Green Component": 0.8926979303359985
+                }
+              },
+              "layout advanced configuration dictionary value": {
+                "draw separator between status bar and terminal": true,
+                "default text color": {
+                  "Red Component": 0.6016838550567627,
+                  "Color Space": "P3",
+                  "Blue Component": 0.648277997970581,
+                  "Alpha Component": 1,
+                  "Green Component": 0.9305252432823181
+                },
+                "remove empty components": false,
+                "algorithm": 0,
+                "background color": {
+                  "Red Component": 0.01528024859726429,
+                  "Color Space": "P3",
+                  "Blue Component": 0.020320845767855644,
+                  "Alpha Component": 1,
+                  "Green Component": 0.03074910305440426
+                },
+                "auto-rainbow style": 0,
+                "font": "Menlo-Regular 12"
+              }
+            }
+          },
+          {
+            "class": "iTermStatusBarCPUUtilizationComponent",
+            "configuration": {
+              "knobs": {
+                "base: priority": 5,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.6618309617042542,
+                  "Color Space": "P3",
+                  "Blue Component": 0.8887607455253601,
+                  "Alpha Component": 1,
+                  "Green Component": 0.7840113043785095
+                }
+              },
+              "layout advanced configuration dictionary value": {
+                "draw separator between status bar and terminal": true,
+                "default text color": {
+                  "Red Component": 0.6016838550567627,
+                  "Color Space": "P3",
+                  "Blue Component": 0.648277997970581,
+                  "Alpha Component": 1,
+                  "Green Component": 0.9305252432823181
+                },
+                "remove empty components": false,
+                "algorithm": 0,
+                "background color": {
+                  "Red Component": 0.01528024859726429,
+                  "Color Space": "P3",
+                  "Blue Component": 0.020320845767855644,
+                  "Alpha Component": 1,
+                  "Green Component": 0.03074910305440426
+                },
+                "auto-rainbow style": 0,
+                "font": "Menlo-Regular 12"
+              }
+            }
+          },
+          {
+            "class": "iTermStatusBarMemoryUtilizationComponent",
+            "configuration": {
+              "knobs": {
+                "base: priority": 5,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.6511958241462708,
+                  "Color Space": "P3",
+                  "Blue Component": 0.8804425597190857,
+                  "Alpha Component": 1,
+                  "Green Component": 0.6308674812316895
+                }
+              },
+              "layout advanced configuration dictionary value": {
+                "draw separator between status bar and terminal": true,
+                "default text color": {
+                  "Red Component": 0.6016838550567627,
+                  "Color Space": "P3",
+                  "Blue Component": 0.648277997970581,
+                  "Alpha Component": 1,
+                  "Green Component": 0.9305252432823181
+                },
+                "remove empty components": false,
+                "algorithm": 0,
+                "background color": {
+                  "Red Component": 0.01528024859726429,
+                  "Color Space": "P3",
+                  "Blue Component": 0.020320845767855644,
+                  "Alpha Component": 1,
+                  "Green Component": 0.03074910305440426
+                },
+                "auto-rainbow style": 0,
+                "font": "Menlo-Regular 12"
+              }
+            }
+          },
+          {
+            "class": "iTermStatusBarNetworkUtilizationComponent",
+            "configuration": {
+              "knobs": {
+                "base: priority": 5,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.8077691793441772,
+                  "Color Space": "P3",
+                  "Blue Component": 0.8829807639122009,
+                  "Alpha Component": 1,
+                  "Green Component": 0.6384488940238953
+                }
+              },
+              "layout advanced configuration dictionary value": {
+                "draw separator between status bar and terminal": true,
+                "default text color": {
+                  "Red Component": 0.6016838550567627,
+                  "Color Space": "P3",
+                  "Blue Component": 0.648277997970581,
+                  "Alpha Component": 1,
+                  "Green Component": 0.9305252432823181
+                },
+                "remove empty components": false,
+                "algorithm": 0,
+                "background color": {
+                  "Red Component": 0.01528024859726429,
+                  "Color Space": "P3",
+                  "Blue Component": 0.020320845767855644,
+                  "Alpha Component": 1,
+                  "Green Component": 0.03074910305440426
+                },
+                "auto-rainbow style": 0,
+                "font": "Menlo-Regular 12"
+              }
+            }
+          },
+          {
+            "class": "iTermStatusBarBatteryComponent",
+            "configuration": {
+              "knobs": {
+                "path": "path",
+                "base: priority": 5,
+                "base: compression resistance": 1,
+                "shared text color": {
+                  "Red Component": 0.8600050806999207,
+                  "Color Space": "P3",
+                  "Blue Component": 0.7688186764717102,
+                  "Alpha Component": 1,
+                  "Green Component": 0.6414304971694946
+                }
+              },
+              "layout advanced configuration dictionary value": {
+                "draw separator between status bar and terminal": true,
+                "default text color": {
+                  "Red Component": 0.6016838550567627,
+                  "Color Space": "P3",
+                  "Blue Component": 0.648277997970581,
+                  "Alpha Component": 1,
+                  "Green Component": 0.9305252432823181
+                },
+                "remove empty components": false,
+                "algorithm": 0,
+                "background color": {
+                  "Red Component": 0.01528024859726429,
+                  "Color Space": "P3",
+                  "Blue Component": 0.020320845767855644,
+                  "Alpha Component": 1,
+                  "Green Component": 0.03074910305440426
+                },
+                "auto-rainbow style": 0,
+                "font": "Menlo-Regular 12"
               }
             }
           }
